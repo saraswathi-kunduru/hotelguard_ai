@@ -791,6 +791,160 @@ hr {
         font-size: 38px !important;
     }
 }
+/* ============================================================
+   FINAL MOBILE TEXT / LETTER VISIBILITY FIX
+   ============================================================ */
+
+@media screen and (max-width: 768px) {
+
+    /* Never clip text */
+    h1,
+    h2,
+    h3,
+    h4,
+    h5,
+    h6,
+    p,
+    span,
+    div {
+        max-width: 100%;
+        overflow-wrap: break-word;
+        word-wrap: break-word;
+    }
+
+    /* Hero text */
+    .hero h1 {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        font-size: clamp(28px, 8vw, 40px) !important;
+        line-height: 1.12 !important;
+
+        letter-spacing: -0.02em !important;
+
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+
+        padding-right: 0 !important;
+    }
+
+    .hero .subtitle {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        font-size: 14px !important;
+        line-height: 1.55 !important;
+
+        white-space: normal !important;
+        overflow: visible !important;
+    }
+
+    .hero .eyebrow {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+
+        letter-spacing: 0.08em !important;
+    }
+
+    .hero .pill {
+        max-width: 100% !important;
+
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    /* Section headings */
+    .section-title {
+        width: 100% !important;
+        max-width: 100% !important;
+
+        white-space: normal !important;
+        overflow: visible !important;
+
+        line-height: 1.3 !important;
+    }
+
+    /* Cards */
+    .glass-card,
+    .kpi-card,
+    .result-card,
+    .form-section {
+        max-width: 100% !important;
+        min-width: 0 !important;
+        overflow: visible !important;
+    }
+
+    .glass-card h3,
+    .glass-card p,
+    .kpi-label,
+    .kpi-value {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: normal !important;
+        overflow-wrap: break-word !important;
+    }
+
+    /* Streamlit markdown containers */
+    [data-testid="stMarkdownContainer"] {
+        max-width: 100% !important;
+        overflow: visible !important;
+    }
+
+    [data-testid="stMarkdownContainer"] p,
+    [data-testid="stMarkdownContainer"] span {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+    }
+
+    /* Buttons */
+    .stButton button {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        line-height: 1.3 !important;
+    }
+
+    /* Metrics */
+    [data-testid="stMetricValue"],
+    [data-testid="stMetricLabel"],
+    [data-testid="stMetricDelta"] {
+        white-space: normal !important;
+        overflow: visible !important;
+        text-overflow: clip !important;
+        word-break: normal !important;
+    }
+}
+
+
+/* Extra-small phones */
+@media screen and (max-width: 480px) {
+
+    .hero h1 {
+        font-size: 28px !important;
+        line-height: 1.12 !important;
+    }
+
+    .hero .subtitle {
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+    }
+
+    .section-title {
+        font-size: 18px !important;
+    }
+
+    .kpi-value {
+        font-size: 21px !important;
+    }
+}
 
 </style>
 """,
