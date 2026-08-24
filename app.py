@@ -792,157 +792,131 @@ hr {
     }
 }
 /* ============================================================
-   FINAL MOBILE TEXT / LETTER VISIBILITY FIX
+   PHONE LEFT-EDGE / TEXT CLIPPING FIX
    ============================================================ */
 
 @media screen and (max-width: 768px) {
 
-    /* Never clip text */
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    p,
-    span,
-    div {
-        max-width: 100%;
-        overflow-wrap: break-word;
-        word-wrap: break-word;
-    }
-
-    /* Hero text */
-    .hero h1 {
+    html,
+    body {
         width: 100% !important;
         max-width: 100% !important;
-
-        font-size: clamp(28px, 8vw, 40px) !important;
-        line-height: 1.12 !important;
-
-        letter-spacing: -0.02em !important;
-
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-
-        padding-right: 0 !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        overflow-x: hidden !important;
     }
 
-    .hero .subtitle {
+    #root,
+    .stApp,
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stAppViewBlockContainer"],
+    .block-container {
         width: 100% !important;
         max-width: 100% !important;
-
-        font-size: 14px !important;
-        line-height: 1.55 !important;
-
-        white-space: normal !important;
-        overflow: visible !important;
+        margin-left: 0 !important;
+        margin-right: 0 !important;
+        padding-left: 12px !important;
+        padding-right: 12px !important;
+        transform: none !important;
     }
 
-    .hero .eyebrow {
-        width: 100% !important;
-        max-width: 100% !important;
-
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-
-        letter-spacing: 0.08em !important;
-    }
-
-    .hero .pill {
-        max-width: 100% !important;
-
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-    }
-
-    /* Section headings */
-    .section-title {
-        width: 100% !important;
-        max-width: 100% !important;
-
-        white-space: normal !important;
-        overflow: visible !important;
-
-        line-height: 1.3 !important;
-    }
-
-    /* Cards */
+    /* Remove desktop positioning from content */
+    .hero,
+    .hero-content,
+    .section-title,
     .glass-card,
     .kpi-card,
     .result-card,
     .form-section {
-        max-width: 100% !important;
-        min-width: 0 !important;
-        overflow: visible !important;
+        margin-left: 0 !important;
+        transform: none !important;
     }
 
+    /* Make all text start inside the screen */
+    .hero h1,
+    .hero h2,
+    .hero p,
+    .hero .eyebrow,
+    .hero .subtitle,
+    .hero .pill,
+    .section-title,
     .glass-card h3,
     .glass-card p,
     .kpi-label,
     .kpi-value {
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        word-break: normal !important;
-        overflow-wrap: break-word !important;
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        transform: none !important;
+        position: relative !important;
+        left: 0 !important;
+        right: auto !important;
     }
 
-    /* Streamlit markdown containers */
+    /* Streamlit columns */
+    [data-testid="stHorizontalBlock"],
+    [data-testid="column"] {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        transform: none !important;
+    }
+
+    /* Markdown blocks */
     [data-testid="stMarkdownContainer"] {
+        margin-left: 0 !important;
+        padding-left: 0 !important;
+        transform: none !important;
+    }
+
+    /* Prevent any child from moving outside phone */
+    [data-testid="stVerticalBlock"] > div {
         max-width: 100% !important;
-        overflow: visible !important;
     }
 
-    [data-testid="stMarkdownContainer"] p,
-    [data-testid="stMarkdownContainer"] span {
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
+    /* Hero text must remain inside viewport */
+    .hero-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        padding-left: 0 !important;
+        margin-left: 0 !important;
     }
 
-    /* Buttons */
-    .stButton button {
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
-        line-height: 1.3 !important;
-    }
-
-    /* Metrics */
-    [data-testid="stMetricValue"],
-    [data-testid="stMetricLabel"],
-    [data-testid="stMetricDelta"] {
-        white-space: normal !important;
-        overflow: visible !important;
-        text-overflow: clip !important;
+    .hero h1 {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-wrap: break-word !important;
         word-break: normal !important;
+        white-space: normal !important;
     }
 }
 
 
-/* Extra-small phones */
+/* ============================================================
+   VERY SMALL PHONES
+   ============================================================ */
+
 @media screen and (max-width: 480px) {
 
-    .hero h1 {
-        font-size: 28px !important;
-        line-height: 1.12 !important;
+    .block-container {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
     }
 
-    .hero .subtitle {
-        font-size: 13px !important;
-        line-height: 1.5 !important;
+    .hero,
+    .glass-card,
+    .kpi-card,
+    .result-card,
+    .form-section {
+        margin-left: 0 !important;
+        margin-right: 0 !important;
     }
 
+    .hero h1,
+    .hero h2,
+    .hero p,
     .section-title {
-        font-size: 18px !important;
-    }
-
-    .kpi-value {
-        font-size: 21px !important;
+        left: 0 !important;
+        margin-left: 0 !important;
     }
 }
 
