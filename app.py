@@ -12,7 +12,7 @@ st.set_page_config(
     page_title="HotelGuard AI",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",
 )
 
 # ============================================================
@@ -509,6 +509,289 @@ hr {
         display: none;
     }
 }
+
+
+/* ============================================================
+   MOBILE PHONE FIX
+   Keeps desktop design unchanged
+   ============================================================ */
+
+@media screen and (max-width: 768px) {
+    .block-container {
+        max-width: 100% !important;
+        width: 100% !important;
+        padding-left: 14px !important;
+        padding-right: 14px !important;
+        padding-top: 1rem !important;
+        padding-bottom: 2rem !important;
+    }
+
+    .stApp {
+        width: 100% !important;
+        max-width: 100vw !important;
+        overflow-x: hidden !important;
+    }
+
+    [data-testid="stAppViewContainer"],
+    [data-testid="stMain"],
+    [data-testid="stVerticalBlock"] {
+        max-width: 100% !important;
+    }
+
+    [data-testid="stSidebar"] {
+        width: min(86vw, 320px) !important;
+        min-width: min(86vw, 320px) !important;
+        max-width: min(86vw, 320px) !important;
+        z-index: 10000 !important;
+    }
+
+    [data-testid="stSidebar"] > div {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    [data-testid="stSidebar"] .stRadio label {
+        font-size: 13px !important;
+        padding: 8px 9px !important;
+        margin-bottom: 2px !important;
+    }
+
+    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
+        max-width: 100% !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    .hero {
+        width: 100% !important;
+        min-height: 430px !important;
+        height: auto !important;
+        padding: 28px 20px !important;
+        margin-bottom: 20px !important;
+        border-radius: 22px !important;
+        position: relative !important;
+        overflow: hidden !important;
+    }
+
+    .hero-content {
+        width: 100% !important;
+        max-width: 100% !important;
+        position: relative !important;
+        z-index: 5 !important;
+    }
+
+    .hero-assistant {
+        width: 100% !important;
+        height: 100% !important;
+        right: 0 !important;
+        top: 0 !important;
+        opacity: 0.12 !important;
+        object-position: 65% center !important;
+        -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.10) 30%, rgba(0,0,0,.55) 65%, #000 100%) !important;
+        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.10) 30%, rgba(0,0,0,.55) 65%, #000 100%) !important;
+    }
+
+    .hero::before {
+        z-index: 2 !important;
+    }
+
+    .hero h1 {
+        position: relative !important;
+        z-index: 5 !important;
+        font-size: clamp(30px, 9vw, 42px) !important;
+        line-height: 1.05 !important;
+        margin: 12px 0 12px 0 !important;
+        max-width: 100% !important;
+        overflow-wrap: normal !important;
+        word-break: normal !important;
+    }
+
+    .hero .eyebrow,
+    .hero .subtitle,
+    .hero .pill {
+        position: relative !important;
+        z-index: 5 !important;
+        max-width: 100% !important;
+    }
+
+    .hero .eyebrow {
+        font-size: 10px !important;
+        line-height: 1.4 !important;
+        letter-spacing: .11em !important;
+    }
+
+    .hero .subtitle {
+        font-size: 15px !important;
+        line-height: 1.55 !important;
+    }
+
+    .hero .pill {
+        font-size: 10px !important;
+        line-height: 1.5 !important;
+    }
+
+    .section-title {
+        font-size: 20px !important;
+        line-height: 1.25 !important;
+        margin-top: 18px !important;
+    }
+
+    [data-testid="stHorizontalBlock"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        gap: 10px !important;
+    }
+
+    [data-testid="column"] {
+        min-width: 0 !important;
+        max-width: 100% !important;
+    }
+
+    .kpi-card,
+    .glass-card,
+    .form-section,
+    .result-card {
+        width: 100% !important;
+        min-width: 0 !important;
+        max-width: 100% !important;
+        overflow: hidden !important;
+    }
+
+    .kpi-card {
+        padding: 16px !important;
+        border-radius: 16px !important;
+    }
+
+    .kpi-value {
+        font-size: 25px !important;
+        overflow-wrap: anywhere !important;
+    }
+
+    .kpi-label {
+        font-size: 10px !important;
+    }
+
+    .glass-card {
+        padding: 17px !important;
+        border-radius: 17px !important;
+    }
+
+    .glass-card h3 {
+        font-size: 16px !important;
+        line-height: 1.3 !important;
+    }
+
+    .glass-card p {
+        font-size: 13px !important;
+        line-height: 1.5 !important;
+    }
+
+    .form-section {
+        padding: 16px !important;
+        border-radius: 17px !important;
+    }
+
+    .stButton > button {
+        width: 100% !important;
+        min-height: 48px !important;
+        font-size: 13px !important;
+    }
+
+    .result-card {
+        padding: 20px !important;
+        border-radius: 20px !important;
+    }
+
+    .risk-number {
+        font-size: 42px !important;
+    }
+
+    [data-testid="stDataFrame"] {
+        width: 100% !important;
+        max-width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    [data-testid="stVegaLiteChart"],
+    [data-testid="stArrowVegaLiteChart"],
+    [data-testid="stPyplotChart"] {
+        max-width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    .stTextInput,
+    .stNumberInput,
+    .stSelectbox,
+    .stDateInput {
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    .ai-particle-layer {
+        z-index: 0 !important;
+    }
+
+    .ai-particle {
+        transform: scale(.75);
+        opacity: .55 !important;
+    }
+}
+
+@media screen and (max-width: 480px) {
+    .block-container {
+        padding-left: 10px !important;
+        padding-right: 10px !important;
+    }
+
+    .hero {
+        min-height: 410px !important;
+        padding: 24px 17px !important;
+        border-radius: 19px !important;
+    }
+
+    .hero h1 {
+        font-size: 31px !important;
+        line-height: 1.02 !important;
+    }
+
+    .hero .subtitle {
+        font-size: 14px !important;
+        line-height: 1.5 !important;
+    }
+
+    .hero .eyebrow {
+        font-size: 9px !important;
+    }
+
+    .hero .pill {
+        font-size: 9px !important;
+        padding: 6px 9px !important;
+    }
+
+    .section-title {
+        font-size: 18px !important;
+    }
+
+    .kpi-card {
+        padding: 14px !important;
+    }
+
+    .kpi-value {
+        font-size: 22px !important;
+    }
+
+    .glass-card {
+        padding: 15px !important;
+    }
+
+    .result-card {
+        padding: 17px !important;
+    }
+
+    .risk-number {
+        font-size: 38px !important;
+    }
+}
+
 </style>
 """,
     unsafe_allow_html=True,
