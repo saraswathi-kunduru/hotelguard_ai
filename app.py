@@ -3,6 +3,9 @@ import pandas as pd
 import joblib
 from pathlib import Path
 import base64
+import numpy as np
+
+
 
 # ============================================================
 # HOTELGUARD AI — PREMIUM STREAMLIT UI
@@ -14,6 +17,61 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed",
 )
+# ============================================================
+# LOAD HOTEL DATA
+# ============================================================
+
+@st.cache_data
+def load_hotel_data():
+    return pd.read_csv("hotel_bookings.csv")
+
+
+@st.cache_data
+def prepare_risk_command_data(df):
+
+    df = df.copy()
+
+    # Rename original Kaggle columns to match model feature names
+    df["total_guests"] = (
+        df["adults"]
+        + df["children"].fillna(0)
+        + df["babies"]
+    )
+
+    df["total_nights"] = (
+        df["stays_in_weekend_nights"]
+        + df["stays_in_week_nights"]
+    )
+
+    df["estimated_booking_value"] = (
+        df["adr"] * df["total_nights"]
+    )
+
+    df["is_long_stay"] = (
+        df["total_nights"] >= 7
+    ).astype(int)
+
+    df["is_high_value_booking"] = (
+        df["estimated_booking_value"] >= 1000
+    ).astype(int)
+
+    df["has_previous_cancellation"] = (
+        df["previous_cancellations"] > 0
+    ).astype(int)
+
+    df["has_booking_changes"] = (
+        df["booking_changes"] > 0
+    ).astype(int)
+
+    df["has_special_request"] = (
+        df["total_of_special_requests"] > 0
+    ).astype(int)
+
+    df["has_weekend_stay"] = (
+        df["stays_in_weekend_nights"] > 0
+    ).astype(int)
+
+    return df
 
 # ============================================================
 # MODEL
@@ -23,17 +81,109 @@ st.set_page_config(
 def load_model():
     return joblib.load("hotelguard_final_model.pkl")
 
-
 model = load_model()
 
+THRESHOLD = 0.32
+# ============================================================
+# RISK COMMAND CENTER - MODEL PREDICTIONS
+# ============================================================
+
+RISK_MODEL_FEATURES = [
+    "hotel",
+    "lead_time",
+    "arrival_date_year",
+    "arrival_date_month",
+    "arrival_date_week_number",
+    "arrival_date_day_of_month",
+    "stays_in_weekend_nights",
+    "stays_in_week_nights",
+    "adults",
+    "children",
+    "babies",
+    "meal",
+    "country",
+    "market_segment",
+    "distribution_channel",
+    "is_repeated_guest",
+    "previous_cancellations",
+    "previous_bookings_not_canceled",
+    "reserved_room_type",
+    "assigned_room_type",
+    "booking_changes",
+    "deposit_type",
+    "agent",
+    "company",
+    "days_in_waiting_list",
+    "customer_type",
+    "adr",
+    "required_car_parking_spaces",
+    "total_of_special_requests",
+    "total_guests",
+    "total_nights",
+    "estimated_booking_value",
+    "is_long_stay",
+    "is_high_value_booking",
+    "has_previous_cancellation",
+    "has_booking_changes",
+    "has_special_request",
+    "has_weekend_stay",
+]
+
+
+@st.cache_data(show_spinner="Analyzing hotel bookings...")
+def generate_risk_predictions():
+
+    # Load and prepare the portfolio data only when the
+    # Risk Command Center is opened. The result is cached.
+    df = load_hotel_data()
+    data = prepare_risk_command_data(df)
+
+    # Use exactly the 38 features used by the production model
+    X_risk = data[RISK_MODEL_FEATURES].copy()
+
+    # Get cancellation probability from the existing XGBoost model
+    probabilities = model.predict_proba(X_risk)[:, 1]
+
+    data["cancellation_probability"] = probabilities
+
+    # Risk categories
+    data["risk_category"] = np.select(
+        [
+            data["cancellation_probability"] >= THRESHOLD,
+            data["cancellation_probability"] >= 0.15,
+        ],
+        [
+            "High Risk",
+            "Medium Risk",
+        ],
+        default="Low Risk",
+    )
+
+    # Expected revenue exposure
+    data["expected_revenue_risk"] = (
+        data["cancellation_probability"]
+        * data["estimated_booking_value"]
+    )
+
+    return data
+
 # Load the generated AI assistant visual from the same project folder.
-# The image is embedded as base64 so Streamlit can display it reliably.
+# Cache the encoded image so page navigation does not repeatedly read
+# and encode the image from disk.
+@st.cache_data
+def load_assistant_image(path):
+    image_path = Path(path)
+    if image_path.exists():
+        return base64.b64encode(image_path.read_bytes()).decode("utf-8")
+    return ""
+
 ASSISTANT_IMAGE_PATH = Path(__file__).with_name("hotelguard_ai_assistant_visual.png")
-if ASSISTANT_IMAGE_PATH.exists():
-    ASSISTANT_IMAGE_DATA = base64.b64encode(ASSISTANT_IMAGE_PATH.read_bytes()).decode("utf-8")
-    ASSISTANT_IMAGE_SRC = f"data:image/png;base64,{ASSISTANT_IMAGE_DATA}"
-else:
-    ASSISTANT_IMAGE_SRC = ""
+ASSISTANT_IMAGE_DATA = load_assistant_image(str(ASSISTANT_IMAGE_PATH))
+ASSISTANT_IMAGE_SRC = (
+    f"data:image/png;base64,{ASSISTANT_IMAGE_DATA}"
+    if ASSISTANT_IMAGE_DATA
+    else ""
+)
 
 THRESHOLD = 0.32
 
@@ -986,6 +1136,7 @@ with st.sidebar:
             "🎯 Booking Risk Prediction",
             "📊 Analytics Dashboard",
             "🧠 Explainable AI",
+            "🏨 Risk Command Center",
             "📈 Model Performance",
         ],
         label_visibility="collapsed",
@@ -1614,7 +1765,91 @@ elif page == "🧠 Explainable AI":
         """,
         unsafe_allow_html=True,
     )
+elif page == "🏨 Risk Command Center":
 
+    page_header(
+        "HOTEL OPERATIONS",
+        "Risk Command Center",
+        "Portfolio-level cancellation risk and revenue exposure.",
+    )
+
+    # Generate predictions only when this page is opened.
+    # The portfolio result is cached, so other pages stay fast.
+    risk_results = generate_risk_predictions()
+
+    # --------------------------------------------------------
+    # KPI CALCULATIONS
+    # --------------------------------------------------------
+
+    total_bookings = len(risk_results)
+
+    high_risk = (
+        risk_results["risk_category"] == "High Risk"
+    ).sum()
+
+    medium_risk = (
+        risk_results["risk_category"] == "Medium Risk"
+    ).sum()
+
+    low_risk = (
+        risk_results["risk_category"] == "Low Risk"
+    ).sum()
+
+    revenue_at_risk = (
+        risk_results["expected_revenue_risk"].sum()
+    )
+
+    # --------------------------------------------------------
+    # BOOKING RISK OVERVIEW
+    # --------------------------------------------------------
+
+    st.markdown("### 🏨 Booking Risk Overview")
+
+    c1, c2, c3, c4 = st.columns(4)
+
+    with c1:
+        kpi(
+            "TOTAL BOOKINGS",
+            f"{total_bookings:,}",
+            "Portfolio"
+        )
+
+    with c2:
+        kpi(
+            "HIGH RISK",
+            f"{high_risk:,}",
+            "Immediate attention"
+        )
+
+    with c3:
+        kpi(
+            "MEDIUM RISK",
+            f"{medium_risk:,}",
+            "Monitor"
+        )
+
+    with c4:
+        kpi(
+            "LOW RISK",
+            f"{low_risk:,}",
+            "Normal"
+        )
+
+    # --------------------------------------------------------
+    # REVENUE EXPOSURE
+    # --------------------------------------------------------
+
+    st.markdown("### 💰 Revenue Exposure")
+
+    st.metric(
+        "Expected Revenue at Risk",
+        f"{revenue_at_risk:,.2f}"
+    )
+
+    st.caption(
+        "Expected revenue at risk is calculated as "
+        "cancellation probability × estimated booking value."
+    )
 # ============================================================
 # MODEL PERFORMANCE
 # ============================================================
@@ -1626,6 +1861,10 @@ elif page == "📈 Model Performance":
         "Model Performance",
         "Validation metrics and the final classification threshold used by HotelGuard AI.",
     )
+
+    # ========================================================
+    # EXISTING XGBOOST PERFORMANCE
+    # ========================================================
 
     performance = pd.DataFrame(
         {
@@ -1647,16 +1886,22 @@ elif page == "📈 Model Performance":
             ],
         }
     )
+
     performance["Percentage"] = performance["Score"] * 100
 
+    # Existing KPI cards
     c1, c2, c3 = st.columns(3)
+
     with c1:
         kpi("ROC-AUC", "92.38%", "Discrimination")
+
     with c2:
         kpi("RECALL", "85.04%", "Cancellation capture")
+
     with c3:
         kpi("F1 SCORE", "74.94%", "Balance")
 
+    # Existing validation metrics
     st.markdown("### 📊 Validation Metrics")
 
     st.bar_chart(
@@ -1670,28 +1915,102 @@ elif page == "📈 Model Performance":
         hide_index=True,
     )
 
+    # ========================================================
+    # ML VS DEEP LEARNING COMPARISON
+    # ========================================================
+
+    st.markdown("### 🤖 ML vs Deep Learning Comparison")
+
+    comparison = pd.DataFrame(
+        {
+            "Metric": [
+                "Accuracy",
+                "Precision",
+                "Recall",
+                "F1 Score",
+                "ROC-AUC",
+                "PR-AUC",
+            ],
+            "XGBoost": [
+                83.30,
+                65.29,
+                84.60,
+                73.70,
+                92.02,
+                82.02,
+            ],
+            "Deep Learning": [
+                84.67,
+                73.43,
+                69.87,
+                71.61,
+                90.92,
+                79.81,
+            ],
+        }
+    )
+
+    # Comparison table
+    st.dataframe(
+        comparison,
+        use_container_width=True,
+        hide_index=True,
+    )
+
+    # Comparison chart
+    st.markdown("### 📊 XGBoost vs Deep Learning")
+
+    st.bar_chart(
+        comparison.set_index("Metric"),
+        use_container_width=True,
+    )
+
+    # Final model selection explanation
+    st.markdown(
+    """
+<div class="glass-card" style="margin-top:18px;">
+<h3>🏆 Final Model Selection</h3>
+
+<p>Both Machine Learning and Deep Learning models were evaluated using the same test dataset.</p>
+
+<p>Deep Learning achieved higher accuracy and precision. However, XGBoost achieved stronger recall, F1 Score, ROC-AUC and PR-AUC.</p>
+
+<p>Since cancellation detection is the primary objective, <b>XGBoost was selected as the final production model.</b></p>
+
+</div>
+""",
+    unsafe_allow_html=True,
+)
+
+    # ========================================================
+    # EXISTING DECISION THRESHOLD
+    # ========================================================
+
     st.markdown("### 🎯 Final Decision Threshold")
 
     c1, c2 = st.columns([1, 2])
 
     with c1:
-        st.metric("Classification Threshold", "0.32")
+        st.metric(
+            "Classification Threshold",
+            "0.32",
+        )
 
     with c2:
         st.markdown(
-            """
-            <div class="glass-card">
-                <h3>Why 0.32?</h3>
-                <p>
-                    The selected threshold is designed to improve cancellation
-                    detection and achieve approximately 85.04% recall. In a real
-                    deployment, the threshold should be monitored and recalibrated
-                    as business costs and booking patterns change.
-                </p>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
+    """
+<div class="glass-card">
+<h3>Why 0.32?</h3>
+
+<p>The selected threshold is designed to improve cancellation detection and achieve approximately 85.04% recall. In a real deployment, the threshold should be monitored and recalibrated as business costs and booking patterns change.</p>
+
+</div>
+""",
+    unsafe_allow_html=True,
+)
+    # ========================================================
+    # EXISTING PRODUCTION SUMMARY
+    # ========================================================
 
     st.markdown("### 🏆 Production Summary")
 
@@ -1699,7 +2018,6 @@ elif page == "📈 Model Performance":
         "HotelGuard AI combines cancellation prediction, explainability and "
         "revenue-at-risk estimation into a decision-support workflow for hotel teams."
     )
-
 # ============================================================
 # FOOTER
 # ============================================================
