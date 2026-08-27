@@ -3,10 +3,9 @@ import pandas as pd
 import joblib
 from pathlib import Path
 import base64
-import numpy as np
-
-
-
+import os
+from dotenv import load_dotenv
+from google import genai
 # ============================================================
 # HOTELGUARD AI — PREMIUM STREAMLIT UI
 # ============================================================
@@ -15,63 +14,8 @@ st.set_page_config(
     page_title="HotelGuard AI",
     page_icon="🛡️",
     layout="wide",
-    initial_sidebar_state="collapsed",
+    initial_sidebar_state="expanded",
 )
-# ============================================================
-# LOAD HOTEL DATA
-# ============================================================
-
-@st.cache_data
-def load_hotel_data():
-    return pd.read_csv("hotel_bookings.csv")
-
-
-@st.cache_data
-def prepare_risk_command_data(df):
-
-    df = df.copy()
-
-    # Rename original Kaggle columns to match model feature names
-    df["total_guests"] = (
-        df["adults"]
-        + df["children"].fillna(0)
-        + df["babies"]
-    )
-
-    df["total_nights"] = (
-        df["stays_in_weekend_nights"]
-        + df["stays_in_week_nights"]
-    )
-
-    df["estimated_booking_value"] = (
-        df["adr"] * df["total_nights"]
-    )
-
-    df["is_long_stay"] = (
-        df["total_nights"] >= 7
-    ).astype(int)
-
-    df["is_high_value_booking"] = (
-        df["estimated_booking_value"] >= 1000
-    ).astype(int)
-
-    df["has_previous_cancellation"] = (
-        df["previous_cancellations"] > 0
-    ).astype(int)
-
-    df["has_booking_changes"] = (
-        df["booking_changes"] > 0
-    ).astype(int)
-
-    df["has_special_request"] = (
-        df["total_of_special_requests"] > 0
-    ).astype(int)
-
-    df["has_weekend_stay"] = (
-        df["stays_in_weekend_nights"] > 0
-    ).astype(int)
-
-    return df
 
 # ============================================================
 # MODEL
@@ -81,111 +25,31 @@ def prepare_risk_command_data(df):
 def load_model():
     return joblib.load("hotelguard_final_model.pkl")
 
+
 model = load_model()
 
-THRESHOLD = 0.32
-# ============================================================
-# RISK COMMAND CENTER - MODEL PREDICTIONS
-# ============================================================
-
-RISK_MODEL_FEATURES = [
-    "hotel",
-    "lead_time",
-    "arrival_date_year",
-    "arrival_date_month",
-    "arrival_date_week_number",
-    "arrival_date_day_of_month",
-    "stays_in_weekend_nights",
-    "stays_in_week_nights",
-    "adults",
-    "children",
-    "babies",
-    "meal",
-    "country",
-    "market_segment",
-    "distribution_channel",
-    "is_repeated_guest",
-    "previous_cancellations",
-    "previous_bookings_not_canceled",
-    "reserved_room_type",
-    "assigned_room_type",
-    "booking_changes",
-    "deposit_type",
-    "agent",
-    "company",
-    "days_in_waiting_list",
-    "customer_type",
-    "adr",
-    "required_car_parking_spaces",
-    "total_of_special_requests",
-    "total_guests",
-    "total_nights",
-    "estimated_booking_value",
-    "is_long_stay",
-    "is_high_value_booking",
-    "has_previous_cancellation",
-    "has_booking_changes",
-    "has_special_request",
-    "has_weekend_stay",
-]
-
-
-@st.cache_data(show_spinner="Analyzing hotel bookings...")
-def generate_risk_predictions():
-
-    # Load and prepare the portfolio data only when the
-    # Risk Command Center is opened. The result is cached.
-    df = load_hotel_data()
-    data = prepare_risk_command_data(df)
-
-    # Use exactly the 38 features used by the production model
-    X_risk = data[RISK_MODEL_FEATURES].copy()
-
-    # Get cancellation probability from the existing XGBoost model
-    probabilities = model.predict_proba(X_risk)[:, 1]
-
-    data["cancellation_probability"] = probabilities
-
-    # Risk categories
-    data["risk_category"] = np.select(
-        [
-            data["cancellation_probability"] >= THRESHOLD,
-            data["cancellation_probability"] >= 0.15,
-        ],
-        [
-            "High Risk",
-            "Medium Risk",
-        ],
-        default="Low Risk",
-    )
-
-    # Expected revenue exposure
-    data["expected_revenue_risk"] = (
-        data["cancellation_probability"]
-        * data["estimated_booking_value"]
-    )
-
-    return data
-
 # Load the generated AI assistant visual from the same project folder.
-# Cache the encoded image so page navigation does not repeatedly read
-# and encode the image from disk.
-@st.cache_data
-def load_assistant_image(path):
-    image_path = Path(path)
-    if image_path.exists():
-        return base64.b64encode(image_path.read_bytes()).decode("utf-8")
-    return ""
-
+# The image is embedded as base64 so Streamlit can display it reliably.
 ASSISTANT_IMAGE_PATH = Path(__file__).with_name("hotelguard_ai_assistant_visual.png")
-ASSISTANT_IMAGE_DATA = load_assistant_image(str(ASSISTANT_IMAGE_PATH))
-ASSISTANT_IMAGE_SRC = (
-    f"data:image/png;base64,{ASSISTANT_IMAGE_DATA}"
-    if ASSISTANT_IMAGE_DATA
-    else ""
-)
+if ASSISTANT_IMAGE_PATH.exists():
+    ASSISTANT_IMAGE_DATA = base64.b64encode(ASSISTANT_IMAGE_PATH.read_bytes()).decode("utf-8")
+    ASSISTANT_IMAGE_SRC = f"data:image/png;base64,{ASSISTANT_IMAGE_DATA}"
+else:
+    ASSISTANT_IMAGE_SRC = ""
 
 THRESHOLD = 0.32
+# ============================================================
+# GEMINI AI CLIENT
+# ============================================================
+
+load_dotenv()
+
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+if GEMINI_API_KEY:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+else:
+    gemini_client = None
 
 # ============================================================
 # DESIGN SYSTEM
@@ -194,7 +58,7 @@ THRESHOLD = 0.32
 st.markdown(
     """
 <style>
-@import url('https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcR4RxxVUkOv264CpFeeMXi_FAHEUf0C1BmQzZvLUTWjZ4l1q-1M7T8SGuWA&s=10');
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
 
 :root {
     --navy: #07111f;
@@ -326,7 +190,8 @@ hr {
             rgba(3, 14, 27, 0.40) 72%,
             rgba(3, 14, 27, 0.34) 100%
         ),
-        url("https://media-cdn.tripadvisor.com/media/photo-s/1e/12/08/86/miracle-resort-hotel.jpg");
+        url("https://media.istockphoto.com/id/903417402/photo/luxury-construction-hotel-with-swimming-pool-at-sunset.jpg?s=612x612&w=0&k=20&c=NyPC_c-wE3W_CImA4t57FpyGy6f428CYROd80jxVC4A=");
+
     background-size: cover;
     background-position: center;
     background-repeat: no-repeat;
@@ -659,417 +524,6 @@ hr {
         display: none;
     }
 }
-
-
-/* ============================================================
-   MOBILE PHONE FIX
-   Keeps desktop design unchanged
-   ============================================================ */
-
-@media screen and (max-width: 768px) {
-    .block-container {
-        max-width: 100% !important;
-        width: 100% !important;
-        padding-left: 14px !important;
-        padding-right: 14px !important;
-        padding-top: 1rem !important;
-        padding-bottom: 2rem !important;
-    }
-
-    .stApp {
-        width: 100% !important;
-        max-width: 100vw !important;
-        overflow-x: hidden !important;
-    }
-
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"],
-    [data-testid="stVerticalBlock"] {
-        max-width: 100% !important;
-    }
-
-    [data-testid="stSidebar"] {
-        width: min(86vw, 320px) !important;
-        min-width: min(86vw, 320px) !important;
-        max-width: min(86vw, 320px) !important;
-        z-index: 10000 !important;
-    }
-
-    [data-testid="stSidebar"] > div {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
-
-    [data-testid="stSidebar"] .stRadio label {
-        font-size: 13px !important;
-        padding: 8px 9px !important;
-        margin-bottom: 2px !important;
-    }
-
-    [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] {
-        max-width: 100% !important;
-        overflow-wrap: anywhere !important;
-    }
-
-    .hero {
-        width: 100% !important;
-        min-height: 430px !important;
-        height: auto !important;
-        padding: 28px 20px !important;
-        margin-bottom: 20px !important;
-        border-radius: 22px !important;
-        position: relative !important;
-        overflow: hidden !important;
-    }
-
-    .hero-content {
-        width: 100% !important;
-        max-width: 100% !important;
-        position: relative !important;
-        z-index: 5 !important;
-    }
-
-    .hero-assistant {
-        width: 100% !important;
-        height: 100% !important;
-        right: 0 !important;
-        top: 0 !important;
-        opacity: 0.12 !important;
-        object-position: 65% center !important;
-        -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.10) 30%, rgba(0,0,0,.55) 65%, #000 100%) !important;
-        mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.10) 30%, rgba(0,0,0,.55) 65%, #000 100%) !important;
-    }
-
-    .hero::before {
-        z-index: 2 !important;
-    }
-
-    .hero h1 {
-        position: relative !important;
-        z-index: 5 !important;
-        font-size: clamp(30px, 9vw, 42px) !important;
-        line-height: 1.05 !important;
-        margin: 12px 0 12px 0 !important;
-        max-width: 100% !important;
-        overflow-wrap: normal !important;
-        word-break: normal !important;
-    }
-
-    .hero .eyebrow,
-    .hero .subtitle,
-    .hero .pill {
-        position: relative !important;
-        z-index: 5 !important;
-        max-width: 100% !important;
-    }
-
-    .hero .eyebrow {
-        font-size: 10px !important;
-        line-height: 1.4 !important;
-        letter-spacing: .11em !important;
-    }
-
-    .hero .subtitle {
-        font-size: 15px !important;
-        line-height: 1.55 !important;
-    }
-
-    .hero .pill {
-        font-size: 10px !important;
-        line-height: 1.5 !important;
-    }
-
-    .section-title {
-        font-size: 20px !important;
-        line-height: 1.25 !important;
-        margin-top: 18px !important;
-    }
-
-    [data-testid="stHorizontalBlock"] {
-        width: 100% !important;
-        max-width: 100% !important;
-        gap: 10px !important;
-    }
-
-    [data-testid="column"] {
-        min-width: 0 !important;
-        max-width: 100% !important;
-    }
-
-    .kpi-card,
-    .glass-card,
-    .form-section,
-    .result-card {
-        width: 100% !important;
-        min-width: 0 !important;
-        max-width: 100% !important;
-        overflow: hidden !important;
-    }
-
-    .kpi-card {
-        padding: 16px !important;
-        border-radius: 16px !important;
-    }
-
-    .kpi-value {
-        font-size: 25px !important;
-        overflow-wrap: anywhere !important;
-    }
-
-    .kpi-label {
-        font-size: 10px !important;
-    }
-
-    .glass-card {
-        padding: 17px !important;
-        border-radius: 17px !important;
-    }
-
-    .glass-card h3 {
-        font-size: 16px !important;
-        line-height: 1.3 !important;
-    }
-
-    .glass-card p {
-        font-size: 13px !important;
-        line-height: 1.5 !important;
-    }
-
-    .form-section {
-        padding: 16px !important;
-        border-radius: 17px !important;
-    }
-
-    .stButton > button {
-        width: 100% !important;
-        min-height: 48px !important;
-        font-size: 13px !important;
-    }
-
-    .result-card {
-        padding: 20px !important;
-        border-radius: 20px !important;
-    }
-
-    .risk-number {
-        font-size: 42px !important;
-    }
-
-    [data-testid="stDataFrame"] {
-        width: 100% !important;
-        max-width: 100% !important;
-        overflow-x: auto !important;
-    }
-
-    [data-testid="stVegaLiteChart"],
-    [data-testid="stArrowVegaLiteChart"],
-    [data-testid="stPyplotChart"] {
-        max-width: 100% !important;
-        overflow-x: auto !important;
-    }
-
-    .stTextInput,
-    .stNumberInput,
-    .stSelectbox,
-    .stDateInput {
-        width: 100% !important;
-        max-width: 100% !important;
-    }
-
-    .ai-particle-layer {
-        z-index: 0 !important;
-    }
-
-    .ai-particle {
-        transform: scale(.75);
-        opacity: .55 !important;
-    }
-}
-
-@media screen and (max-width: 480px) {
-    .block-container {
-        padding-left: 10px !important;
-        padding-right: 10px !important;
-    }
-
-    .hero {
-        min-height: 410px !important;
-        padding: 24px 17px !important;
-        border-radius: 19px !important;
-    }
-
-    .hero h1 {
-        font-size: 31px !important;
-        line-height: 1.02 !important;
-    }
-
-    .hero .subtitle {
-        font-size: 14px !important;
-        line-height: 1.5 !important;
-    }
-
-    .hero .eyebrow {
-        font-size: 9px !important;
-    }
-
-    .hero .pill {
-        font-size: 9px !important;
-        padding: 6px 9px !important;
-    }
-
-    .section-title {
-        font-size: 18px !important;
-    }
-
-    .kpi-card {
-        padding: 14px !important;
-    }
-
-    .kpi-value {
-        font-size: 22px !important;
-    }
-
-    .glass-card {
-        padding: 15px !important;
-    }
-
-    .result-card {
-        padding: 17px !important;
-    }
-
-    .risk-number {
-        font-size: 38px !important;
-    }
-}
-/* ============================================================
-   PHONE LEFT-EDGE / TEXT CLIPPING FIX
-   ============================================================ */
-
-@media screen and (max-width: 768px) {
-
-    html,
-    body {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin: 0 !important;
-        padding: 0 !important;
-        overflow-x: hidden !important;
-    }
-
-    #root,
-    .stApp,
-    [data-testid="stAppViewContainer"],
-    [data-testid="stMain"],
-    [data-testid="stAppViewBlockContainer"],
-    .block-container {
-        width: 100% !important;
-        max-width: 100% !important;
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-        padding-left: 12px !important;
-        padding-right: 12px !important;
-        transform: none !important;
-    }
-
-    /* Remove desktop positioning from content */
-    .hero,
-    .hero-content,
-    .section-title,
-    .glass-card,
-    .kpi-card,
-    .result-card,
-    .form-section {
-        margin-left: 0 !important;
-        transform: none !important;
-    }
-
-    /* Make all text start inside the screen */
-    .hero h1,
-    .hero h2,
-    .hero p,
-    .hero .eyebrow,
-    .hero .subtitle,
-    .hero .pill,
-    .section-title,
-    .glass-card h3,
-    .glass-card p,
-    .kpi-label,
-    .kpi-value {
-        margin-left: 0 !important;
-        padding-left: 0 !important;
-        transform: none !important;
-        position: relative !important;
-        left: 0 !important;
-        right: auto !important;
-    }
-
-    /* Streamlit columns */
-    [data-testid="stHorizontalBlock"],
-    [data-testid="column"] {
-        margin-left: 0 !important;
-        padding-left: 0 !important;
-        transform: none !important;
-    }
-
-    /* Markdown blocks */
-    [data-testid="stMarkdownContainer"] {
-        margin-left: 0 !important;
-        padding-left: 0 !important;
-        transform: none !important;
-    }
-
-    /* Prevent any child from moving outside phone */
-    [data-testid="stVerticalBlock"] > div {
-        max-width: 100% !important;
-    }
-
-    /* Hero text must remain inside viewport */
-    .hero-content {
-        width: 100% !important;
-        max-width: 100% !important;
-        padding-left: 0 !important;
-        margin-left: 0 !important;
-    }
-
-    .hero h1 {
-        width: 100% !important;
-        max-width: 100% !important;
-        overflow-wrap: break-word !important;
-        word-break: normal !important;
-        white-space: normal !important;
-    }
-}
-
-
-/* ============================================================
-   VERY SMALL PHONES
-   ============================================================ */
-
-@media screen and (max-width: 480px) {
-
-    .block-container {
-        padding-left: 10px !important;
-        padding-right: 10px !important;
-    }
-
-    .hero,
-    .glass-card,
-    .kpi-card,
-    .result-card,
-    .form-section {
-        margin-left: 0 !important;
-        margin-right: 0 !important;
-    }
-
-    .hero h1,
-    .hero h2,
-    .hero p,
-    .section-title {
-        left: 0 !important;
-        margin-left: 0 !important;
-    }
-}
-
 </style>
 """,
     unsafe_allow_html=True,
@@ -1132,14 +586,15 @@ with st.sidebar:
     page = st.radio(
         "Navigation",
         [
-            "🏠 Executive Home",
-            "🎯 Booking Risk Prediction",
-            "📊 Analytics Dashboard",
-            "🧠 Explainable AI",
-            "🏨 Risk Command Center",
-            "🕒 Smart Waiting List",
-            "📈 Model Performance",
-        ],
+    "🏠 Executive Home",
+    "🎯 Booking Risk Prediction",
+    "📊 Analytics Dashboard",
+    "🧠 Explainable AI",
+    "🏨 Risk Command Center",
+    "🕒 Smart Waiting List",
+    "📈 Model Performance",
+    "💬 HotelGuard AI Chatbot",
+],
         label_visibility="collapsed",
     )
 
@@ -1766,384 +1221,6 @@ elif page == "🧠 Explainable AI":
         """,
         unsafe_allow_html=True,
     )
-elif page == "🏨 Risk Command Center":
-
-    page_header(
-        "HOTEL OPERATIONS",
-        "Risk Command Center",
-        "Portfolio-level cancellation risk and revenue exposure.",
-    )
-
-    # Generate predictions only when this page is opened.
-    # The portfolio result is cached, so other pages stay fast.
-    risk_results = generate_risk_predictions()
-
-    # --------------------------------------------------------
-    # KPI CALCULATIONS
-    # --------------------------------------------------------
-
-    total_bookings = len(risk_results)
-
-    high_risk = (
-        risk_results["risk_category"] == "High Risk"
-    ).sum()
-
-    medium_risk = (
-        risk_results["risk_category"] == "Medium Risk"
-    ).sum()
-
-    low_risk = (
-        risk_results["risk_category"] == "Low Risk"
-    ).sum()
-
-    revenue_at_risk = (
-        risk_results["expected_revenue_risk"].sum()
-    )
-
-    # --------------------------------------------------------
-    # BOOKING RISK OVERVIEW
-    # --------------------------------------------------------
-
-    st.markdown("### 🏨 Booking Risk Overview")
-
-    c1, c2, c3, c4 = st.columns(4)
-
-    with c1:
-        kpi(
-            "TOTAL BOOKINGS",
-            f"{total_bookings:,}",
-            "Portfolio"
-        )
-
-    with c2:
-        kpi(
-            "HIGH RISK",
-            f"{high_risk:,}",
-            "Immediate attention"
-        )
-
-    with c3:
-        kpi(
-            "MEDIUM RISK",
-            f"{medium_risk:,}",
-            "Monitor"
-        )
-
-    with c4:
-        kpi(
-            "LOW RISK",
-            f"{low_risk:,}",
-            "Normal"
-        )
-
-    # --------------------------------------------------------
-    # REVENUE EXPOSURE
-    # --------------------------------------------------------
-
-    st.markdown("### 💰 Revenue Exposure")
-
-    st.metric(
-        "Expected Revenue at Risk",
-        f"{revenue_at_risk:,.2f}"
-    )
-
-    st.caption(
-        "Expected revenue at risk is calculated as "
-        "cancellation probability × estimated booking value."
-    )
-# ============================================================
-# SMART WAITING LIST
-# ============================================================
-
-elif page == "🕒 Smart Waiting List":
-
-    page_header(
-        "HOTEL OPERATIONS",
-        "Smart Waiting List",
-        "Prioritize waiting customers when rooms become available.",
-    )
-
-    st.markdown(
-        """
-        <div class="glass-card">
-            <h3>🕒 Room Availability & Waiting List Prioritization</h3>
-            <p>
-                Add waiting customers below and HotelGuard AI will rank them
-                using a transparent operational priority score based on
-                arrival urgency, waiting time, and booking requirements.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    st.markdown("### 🏨 Room Availability")
-
-    room_col1, room_col2 = st.columns(2)
-
-    with room_col1:
-        available_rooms = st.number_input(
-            "Rooms Currently Available",
-            min_value=1,
-            max_value=500,
-            value=3,
-            step=1,
-            key="waiting_available_rooms",
-        )
-
-    with room_col2:
-        priority_mode = st.selectbox(
-            "Priority Strategy",
-            [
-                "Balanced",
-                "Arrival Urgency",
-                "Waiting Time",
-            ],
-            key="waiting_priority_mode",
-        )
-
-    st.markdown("### 👥 Waiting Customers")
-
-    waiting_default = pd.DataFrame(
-        [
-            {
-                "Customer": "WL-001",
-                "Days Waiting": 5,
-                "Arrival In": 2,
-                "Guests": 2,
-                "Room Type": "A",
-                "Special Requests": 1,
-            },
-            {
-                "Customer": "WL-002",
-                "Days Waiting": 12,
-                "Arrival In": 7,
-                "Guests": 3,
-                "Room Type": "B",
-                "Special Requests": 0,
-            },
-            {
-                "Customer": "WL-003",
-                "Days Waiting": 3,
-                "Arrival In": 1,
-                "Guests": 2,
-                "Room Type": "A",
-                "Special Requests": 2,
-            },
-            {
-                "Customer": "WL-004",
-                "Days Waiting": 18,
-                "Arrival In": 14,
-                "Guests": 1,
-                "Room Type": "C",
-                "Special Requests": 0,
-            },
-            {
-                "Customer": "WL-005",
-                "Days Waiting": 8,
-                "Arrival In": 4,
-                "Guests": 4,
-                "Room Type": "B",
-                "Special Requests": 1,
-            },
-        ]
-    )
-
-    waiting_data = st.data_editor(
-        waiting_default,
-        use_container_width=True,
-        hide_index=True,
-        num_rows="dynamic",
-        key="hotelguard_waiting_list",
-        column_config={
-            "Customer": st.column_config.TextColumn(
-                "Customer ID",
-                help="Unique waiting-list reference.",
-            ),
-            "Days Waiting": st.column_config.NumberColumn(
-                "Days Waiting",
-                min_value=0,
-                step=1,
-            ),
-            "Arrival In": st.column_config.NumberColumn(
-                "Arrival In (days)",
-                min_value=0,
-                step=1,
-            ),
-            "Guests": st.column_config.NumberColumn(
-                "Guests",
-                min_value=1,
-                step=1,
-            ),
-            "Room Type": st.column_config.TextColumn(
-                "Requested Room",
-            ),
-            "Special Requests": st.column_config.NumberColumn(
-                "Special Requests",
-                min_value=0,
-                step=1,
-            ),
-        },
-    )
-
-    if waiting_data.empty:
-        st.info("Add at least one customer to generate the priority queue.")
-    else:
-        queue = waiting_data.copy()
-
-        numeric_columns = [
-            "Days Waiting",
-            "Arrival In",
-            "Guests",
-            "Special Requests",
-        ]
-
-        for column in numeric_columns:
-            queue[column] = pd.to_numeric(
-                queue[column], errors="coerce"
-            ).fillna(0)
-
-        # --------------------------------------------------------
-        # TRANSPARENT PRIORITY SCORING
-        # --------------------------------------------------------
-        # Higher score = higher operational priority.
-        # The score is intentionally rule-based and transparent;
-        # it does not alter or retrain the existing XGBoost model.
-
-        max_wait = max(float(queue["Days Waiting"].max()), 1.0)
-        max_arrival = max(float(queue["Arrival In"].max()), 1.0)
-        max_requests = max(float(queue["Special Requests"].max()), 1.0)
-
-        queue["Waiting Score"] = (
-            queue["Days Waiting"] / max_wait
-        ) * 100
-
-        queue["Arrival Urgency"] = (
-            1 - (queue["Arrival In"] / max_arrival)
-        ) * 100
-
-        queue["Request Score"] = (
-            queue["Special Requests"] / max_requests
-        ) * 100
-
-        if priority_mode == "Arrival Urgency":
-            queue["Priority Score"] = (
-                queue["Arrival Urgency"] * 0.60
-                + queue["Waiting Score"] * 0.25
-                + queue["Request Score"] * 0.15
-            )
-        elif priority_mode == "Waiting Time":
-            queue["Priority Score"] = (
-                queue["Waiting Score"] * 0.60
-                + queue["Arrival Urgency"] * 0.25
-                + queue["Request Score"] * 0.15
-            )
-        else:
-            queue["Priority Score"] = (
-                queue["Arrival Urgency"] * 0.45
-                + queue["Waiting Score"] * 0.40
-                + queue["Request Score"] * 0.15
-            )
-
-        queue = queue.sort_values(
-            "Priority Score",
-            ascending=False,
-        ).reset_index(drop=True)
-
-        queue["Priority"] = np.select(
-            [
-                queue["Priority Score"] >= 70,
-                queue["Priority Score"] >= 45,
-            ],
-            [
-                "🔴 High",
-                "🟡 Medium",
-            ],
-            default="🟢 Low",
-        )
-
-        queue["Rank"] = np.arange(1, len(queue) + 1)
-
-        recommended = queue.head(int(available_rooms))
-
-        st.markdown("### 🎯 Recommended Contact Queue")
-
-        k1, k2, k3 = st.columns(3)
-
-        with k1:
-            kpi(
-                "WAITING CUSTOMERS",
-                f"{len(queue):,}",
-                "Current queue",
-            )
-
-        with k2:
-            kpi(
-                "ROOMS AVAILABLE",
-                f"{available_rooms:,}",
-                "Ready to allocate",
-            )
-
-        with k3:
-            kpi(
-                "PRIORITY CONTACTS",
-                f"{len(recommended):,}",
-                "Recommended first",
-            )
-
-        display_queue = queue[
-            [
-                "Rank",
-                "Customer",
-                "Priority",
-                "Priority Score",
-                "Days Waiting",
-                "Arrival In",
-                "Guests",
-                "Room Type",
-                "Special Requests",
-            ]
-        ].copy()
-
-        display_queue["Priority Score"] = (
-            display_queue["Priority Score"].round(1)
-        )
-
-        st.dataframe(
-            display_queue,
-            use_container_width=True,
-            hide_index=True,
-        )
-
-        st.markdown("### ⭐ Recommended Customers")
-
-        for _, row in recommended.iterrows():
-            if row["Priority Score"] >= 70:
-                st.error(
-                    f"**{row['Customer']} — High Priority**  "
-                    f"| Score: {row['Priority Score']:.1f}  "
-                    f"| Arrival in {int(row['Arrival In'])} days  "
-                    f"| Waiting {int(row['Days Waiting'])} days"
-                )
-            elif row["Priority Score"] >= 45:
-                st.warning(
-                    f"**{row['Customer']} — Medium Priority**  "
-                    f"| Score: {row['Priority Score']:.1f}  "
-                    f"| Arrival in {int(row['Arrival In'])} days  "
-                    f"| Waiting {int(row['Days Waiting'])} days"
-                )
-            else:
-                st.success(
-                    f"**{row['Customer']} — Low Priority**  "
-                    f"| Score: {row['Priority Score']:.1f}  "
-                    f"| Arrival in {int(row['Arrival In'])} days  "
-                    f"| Waiting {int(row['Days Waiting'])} days"
-                )
-
-        st.caption(
-            "Priority Score is an operational ranking aid based on the selected "
-            "strategy. It does not retrain or modify the existing XGBoost model."
-        )
 
 # ============================================================
 # MODEL PERFORMANCE
@@ -2156,10 +1233,6 @@ elif page == "📈 Model Performance":
         "Model Performance",
         "Validation metrics and the final classification threshold used by HotelGuard AI.",
     )
-
-    # ========================================================
-    # EXISTING XGBOOST PERFORMANCE
-    # ========================================================
 
     performance = pd.DataFrame(
         {
@@ -2181,22 +1254,16 @@ elif page == "📈 Model Performance":
             ],
         }
     )
-
     performance["Percentage"] = performance["Score"] * 100
 
-    # Existing KPI cards
     c1, c2, c3 = st.columns(3)
-
     with c1:
         kpi("ROC-AUC", "92.38%", "Discrimination")
-
     with c2:
         kpi("RECALL", "85.04%", "Cancellation capture")
-
     with c3:
         kpi("F1 SCORE", "74.94%", "Balance")
 
-    # Existing validation metrics
     st.markdown("### 📊 Validation Metrics")
 
     st.bar_chart(
@@ -2210,102 +1277,28 @@ elif page == "📈 Model Performance":
         hide_index=True,
     )
 
-    # ========================================================
-    # ML VS DEEP LEARNING COMPARISON
-    # ========================================================
-
-    st.markdown("### 🤖 ML vs Deep Learning Comparison")
-
-    comparison = pd.DataFrame(
-        {
-            "Metric": [
-                "Accuracy",
-                "Precision",
-                "Recall",
-                "F1 Score",
-                "ROC-AUC",
-                "PR-AUC",
-            ],
-            "XGBoost": [
-                83.30,
-                65.29,
-                84.60,
-                73.70,
-                92.02,
-                82.02,
-            ],
-            "Deep Learning": [
-                84.67,
-                73.43,
-                69.87,
-                71.61,
-                90.92,
-                79.81,
-            ],
-        }
-    )
-
-    # Comparison table
-    st.dataframe(
-        comparison,
-        use_container_width=True,
-        hide_index=True,
-    )
-
-    # Comparison chart
-    st.markdown("### 📊 XGBoost vs Deep Learning")
-
-    st.bar_chart(
-        comparison.set_index("Metric"),
-        use_container_width=True,
-    )
-
-    # Final model selection explanation
-    st.markdown(
-    """
-<div class="glass-card" style="margin-top:18px;">
-<h3>🏆 Final Model Selection</h3>
-
-<p>Both Machine Learning and Deep Learning models were evaluated using the same test dataset.</p>
-
-<p>Deep Learning achieved higher accuracy and precision. However, XGBoost achieved stronger recall, F1 Score, ROC-AUC and PR-AUC.</p>
-
-<p>Since cancellation detection is the primary objective, <b>XGBoost was selected as the final production model.</b></p>
-
-</div>
-""",
-    unsafe_allow_html=True,
-)
-
-    # ========================================================
-    # EXISTING DECISION THRESHOLD
-    # ========================================================
-
     st.markdown("### 🎯 Final Decision Threshold")
 
     c1, c2 = st.columns([1, 2])
 
     with c1:
-        st.metric(
-            "Classification Threshold",
-            "0.32",
-        )
+        st.metric("Classification Threshold", "0.32")
 
     with c2:
         st.markdown(
-    """
-<div class="glass-card">
-<h3>Why 0.32?</h3>
-
-<p>The selected threshold is designed to improve cancellation detection and achieve approximately 85.04% recall. In a real deployment, the threshold should be monitored and recalibrated as business costs and booking patterns change.</p>
-
-</div>
-""",
-    unsafe_allow_html=True,
-)
-    # ========================================================
-    # EXISTING PRODUCTION SUMMARY
-    # ========================================================
+            """
+            <div class="glass-card">
+                <h3>Why 0.32?</h3>
+                <p>
+                    The selected threshold is designed to improve cancellation
+                    detection and achieve approximately 85.04% recall. In a real
+                    deployment, the threshold should be monitored and recalibrated
+                    as business costs and booking patterns change.
+                </p>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
     st.markdown("### 🏆 Production Summary")
 
@@ -2313,6 +1306,225 @@ elif page == "📈 Model Performance":
         "HotelGuard AI combines cancellation prediction, explainability and "
         "revenue-at-risk estimation into a decision-support workflow for hotel teams."
     )
+    # ============================================================
+# HOTELGUARD AI CHATBOT
+# ============================================================
+
+elif page == "💬 HotelGuard AI Chatbot":
+
+    page_header(
+        "AI HOTEL ASSISTANT",
+        "HotelGuard AI Chatbot",
+        "Ask questions about hotel cancellations, booking risk, revenue protection and hotel operations.",
+    )
+
+    # --------------------------------------------------------
+    # CHATBOT INTRO
+    # --------------------------------------------------------
+
+    st.markdown(
+        """
+        <div class="glass-card">
+            <h3>🤖 HotelGuard AI Assistant</h3>
+            <p>
+                Ask the assistant about cancellation risk, hotel bookings,
+                revenue protection, customer communication and operational
+                decisions.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # --------------------------------------------------------
+    # CHECK API KEY
+    # --------------------------------------------------------
+
+    if gemini_client is None:
+
+        st.error(
+            "Gemini API key was not found. "
+            "Please check your .env file."
+        )
+
+    else:
+
+        # ----------------------------------------------------
+        # CHAT HISTORY
+        # ----------------------------------------------------
+
+        if "hotelguard_chat_history" not in st.session_state:
+            st.session_state.hotelguard_chat_history = []
+
+        # ----------------------------------------------------
+        # DISPLAY PREVIOUS MESSAGES
+        # ----------------------------------------------------
+
+        for message in st.session_state.hotelguard_chat_history:
+
+            if message["role"] == "user":
+
+                with st.chat_message("user"):
+                    st.markdown(message["content"])
+
+            else:
+
+                with st.chat_message("assistant"):
+                    st.markdown(message["content"])
+
+        # ----------------------------------------------------
+        # CHAT INPUT
+        # ----------------------------------------------------
+
+        user_question = st.chat_input(
+            "Ask HotelGuard AI something..."
+        )
+
+        if user_question:
+
+            # Display user message immediately
+            with st.chat_message("user"):
+                st.markdown(user_question)
+
+            st.session_state.hotelguard_chat_history.append(
+                {
+                    "role": "user",
+                    "content": user_question,
+                }
+            )
+
+            # ------------------------------------------------
+            # HOTELGUARD SYSTEM CONTEXT
+            # ------------------------------------------------
+
+            system_context = """
+You are HotelGuard AI, an intelligent hotel revenue and
+cancellation-risk assistant.
+
+HotelGuard AI is a hotel decision-support system.
+
+The system uses a tuned XGBoost model to predict hotel booking
+cancellation probability.
+
+Important system information:
+
+- Production model: Tuned XGBoost
+- Decision threshold: 0.32
+- ROC-AUC: 92.38%
+- Recall: 85.04%
+- PR-AUC: 82.67%
+- F1 Score: 74.94%
+
+Risk framework:
+
+- Below 32%: Low Risk
+- 32% to below 50%: Medium Risk
+- 50% to below 75%: High Risk
+- 75% or above: Critical Risk
+
+Revenue at risk is estimated as:
+
+cancellation probability × estimated booking value
+
+Your job is to help hotel staff understand cancellation risk,
+booking operations, revenue protection and customer communication.
+
+Give practical, concise and professional answers.
+
+Do not claim that you personally made a prediction unless
+booking data has actually been provided.
+
+If the user asks about a specific booking without providing
+booking information, explain what information is needed.
+
+Never invent booking data, hotel policies, prices or customer
+information.
+
+You can explain machine-learning concepts in simple language.
+
+When recommending actions, focus on realistic hotel operations
+such as confirmation messages, proactive communication,
+monitoring, flexible modification options and prioritization.
+
+You are an assistant for decision support, not a replacement
+for hotel management.
+"""
+
+            # ------------------------------------------------
+            # CONVERSATION
+            # ------------------------------------------------
+
+            conversation_text = ""
+
+            for message in st.session_state.hotelguard_chat_history:
+
+                role = message["role"].upper()
+
+                conversation_text += (
+                    f"\n{role}: {message['content']}\n"
+                )
+
+            prompt = (
+                system_context
+                + "\n\nConversation so far:"
+                + conversation_text
+                + "\n\nRespond to the latest user question."
+            )
+
+            # ------------------------------------------------
+            # GEMINI REQUEST
+            # ------------------------------------------------
+
+            with st.chat_message("assistant"):
+
+                with st.spinner("HotelGuard AI is thinking..."):
+
+                    try:
+
+                        response = gemini_client.models.generate_content(
+                            model="gemini-2.5-flash-lite",
+                            contents=prompt,
+                        )
+
+                        answer = response.text
+
+                        st.markdown(answer)
+
+                        st.session_state.hotelguard_chat_history.append(
+                            {
+                                "role": "assistant",
+                                "content": answer,
+                            }
+                        )
+
+                    except Exception as e:
+
+                        st.error(
+                            "HotelGuard AI could not generate a response."
+                        )
+
+                        st.caption(
+                            "Please check your internet connection "
+                            "and Gemini API availability."
+                        )
+
+                        st.exception(e)
+
+        # ----------------------------------------------------
+        # CLEAR CHAT
+        # ----------------------------------------------------
+
+        if st.session_state.hotelguard_chat_history:
+
+            if st.button(
+                "🗑️ Clear Chat",
+                use_container_width=True,
+            ):
+
+                st.session_state.hotelguard_chat_history = []
+
+                st.rerun()
+
 # ============================================================
 # FOOTER
 # ============================================================
