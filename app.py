@@ -44,8 +44,17 @@ THRESHOLD = 0.32
 
 load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+# Try Streamlit Cloud Secrets first
+try:
+    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
+except Exception:
+    GEMINI_API_KEY = None
 
+# If not found in Streamlit Secrets, try local .env
+if not GEMINI_API_KEY:
+    GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+
+# Create Gemini client
 if GEMINI_API_KEY:
     gemini_client = genai.Client(api_key=GEMINI_API_KEY)
 else:
