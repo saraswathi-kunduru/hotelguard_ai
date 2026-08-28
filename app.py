@@ -524,10 +524,26 @@ hr {
         display: none;
     }
 }
+
+[data-testid="stPopover"] > button {
+    border-radius: 50% !important;
+    width: 52px !important;
+    height: 52px !important;
+    min-height: 52px !important;
+    padding: 0 !important;
+    font-size: 25px !important;
+    background: linear-gradient(135deg, #2563eb, #0ea5e9) !important;
+    border: 1px solid rgba(125,211,252,.45) !important;
+    box-shadow: 0 10px 30px rgba(14,165,233,.35) !important;
+}
+[data-testid="stPopover"] > button:hover {
+    transform: translateY(-2px) scale(1.04);
+}
 </style>
 """,
     unsafe_allow_html=True,
 )
+
 
 
 # ============================================================
@@ -593,7 +609,6 @@ with st.sidebar:
     "🏨 Risk Command Center",
     "🕒 Smart Waiting List",
     "📈 Model Performance",
-    "💬 HotelGuard AI Chatbot",
 ],
         label_visibility="collapsed",
     )
@@ -617,6 +632,94 @@ with st.sidebar:
         """,
         unsafe_allow_html=True,
     )
+
+# ============================================================
+# FLOATING HOTELGUARD AI CHATBOT
+# ============================================================
+# The chatbot is available from the top-right corner on every page.
+
+_chat_left, _chat_spacer, _chat_right = st.columns([5.8, 3.0, 1.2])
+with _chat_right:
+    with st.popover("🤖", use_container_width=True):
+        st.markdown("### 🛡️ HotelGuard AI")
+        st.caption("Hotel operations, cancellation risk & revenue protection")
+
+        if gemini_client is None:
+            st.warning("Gemini API key was not found. Add GEMINI_API_KEY to your Streamlit secrets or .env file.")
+        else:
+            if "hotelguard_chat_history" not in st.session_state:
+                st.session_state.hotelguard_chat_history = []
+
+            for _message in st.session_state.hotelguard_chat_history:
+                with st.chat_message(_message["role"]):
+                    st.markdown(_message["content"])
+
+            _user_question = st.chat_input("Ask HotelGuard AI...")
+
+            if _user_question:
+                st.session_state.hotelguard_chat_history.append({
+                    "role": "user",
+                    "content": _user_question,
+                })
+                with st.chat_message("user"):
+                    st.markdown(_user_question)
+
+                _system_context = """
+You are HotelGuard AI, an intelligent hotel revenue and cancellation-risk assistant.
+
+HotelGuard AI is a hotel decision-support system using a tuned XGBoost model to predict hotel booking cancellation probability.
+
+System information:
+- Production model: Tuned XGBoost
+- Decision threshold: 0.32
+- ROC-AUC: 92.38%
+- Recall: 85.04%
+- PR-AUC: 82.67%
+- F1 Score: 74.94%
+
+Risk framework:
+- Below 32%: Low Risk
+- 32% to below 50%: Medium Risk
+- 50% to below 75%: High Risk
+- 75% or above: Critical Risk
+
+Revenue at risk = cancellation probability × estimated booking value.
+
+Give practical, concise and professional answers. Never invent booking data, hotel policies, prices or customer information. Do not claim to have made a booking prediction unless booking data has actually been provided. For specific bookings without data, explain what information is needed. You are a decision-support assistant, not a replacement for hotel management.
+"""
+
+                _conversation = "".join(
+                    f"\n{m['role'].upper()}: {m['content']}\n"
+                    for m in st.session_state.hotelguard_chat_history
+                )
+                _prompt = (
+                    _system_context
+                    + "\nConversation so far:"
+                    + _conversation
+                    + "\nRespond to the latest user question."
+                )
+
+                with st.chat_message("assistant"):
+                    with st.spinner("Thinking..."):
+                        try:
+                            _response = gemini_client.models.generate_content(
+                                model="gemini-2.5-flash-lite",
+                                contents=_prompt,
+                            )
+                            _answer = _response.text
+                            st.markdown(_answer)
+                            st.session_state.hotelguard_chat_history.append({
+                                "role": "assistant",
+                                "content": _answer,
+                            })
+                        except Exception:
+                            st.error("HotelGuard AI could not generate a response.")
+                            st.caption("Please check your Gemini API key and API availability.")
+
+            if st.session_state.hotelguard_chat_history:
+                if st.button("🗑️ Clear Chat", key="floating_clear_chat", use_container_width=True):
+                    st.session_state.hotelguard_chat_history = []
+                    st.rerun()
 
 # ============================================================
 # HELPERS
@@ -1307,225 +1410,6 @@ elif page == "📈 Model Performance":
         "revenue-at-risk estimation into a decision-support workflow for hotel teams."
     )
     # ============================================================
-# HOTELGUARD AI CHATBOT
-# ============================================================
-
-elif page == "💬 HotelGuard AI Chatbot":
-
-    page_header(
-        "AI HOTEL ASSISTANT",
-        "HotelGuard AI Chatbot",
-        "Ask questions about hotel cancellations, booking risk, revenue protection and hotel operations.",
-    )
-
-    # --------------------------------------------------------
-    # CHATBOT INTRO
-    # --------------------------------------------------------
-
-    st.markdown(
-        """
-        <div class="glass-card">
-            <h3>🤖 HotelGuard AI Assistant</h3>
-            <p>
-                Ask the assistant about cancellation risk, hotel bookings,
-                revenue protection, customer communication and operational
-                decisions.
-            </p>
-        </div>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # --------------------------------------------------------
-    # CHECK API KEY
-    # --------------------------------------------------------
-
-    if gemini_client is None:
-
-        st.error(
-            "Gemini API key was not found. "
-            "Please check your .env file."
-        )
-
-    else:
-
-        # ----------------------------------------------------
-        # CHAT HISTORY
-        # ----------------------------------------------------
-
-        if "hotelguard_chat_history" not in st.session_state:
-            st.session_state.hotelguard_chat_history = []
-
-        # ----------------------------------------------------
-        # DISPLAY PREVIOUS MESSAGES
-        # ----------------------------------------------------
-
-        for message in st.session_state.hotelguard_chat_history:
-
-            if message["role"] == "user":
-
-                with st.chat_message("user"):
-                    st.markdown(message["content"])
-
-            else:
-
-                with st.chat_message("assistant"):
-                    st.markdown(message["content"])
-
-        # ----------------------------------------------------
-        # CHAT INPUT
-        # ----------------------------------------------------
-
-        user_question = st.chat_input(
-            "Ask HotelGuard AI something..."
-        )
-
-        if user_question:
-
-            # Display user message immediately
-            with st.chat_message("user"):
-                st.markdown(user_question)
-
-            st.session_state.hotelguard_chat_history.append(
-                {
-                    "role": "user",
-                    "content": user_question,
-                }
-            )
-
-            # ------------------------------------------------
-            # HOTELGUARD SYSTEM CONTEXT
-            # ------------------------------------------------
-
-            system_context = """
-You are HotelGuard AI, an intelligent hotel revenue and
-cancellation-risk assistant.
-
-HotelGuard AI is a hotel decision-support system.
-
-The system uses a tuned XGBoost model to predict hotel booking
-cancellation probability.
-
-Important system information:
-
-- Production model: Tuned XGBoost
-- Decision threshold: 0.32
-- ROC-AUC: 92.38%
-- Recall: 85.04%
-- PR-AUC: 82.67%
-- F1 Score: 74.94%
-
-Risk framework:
-
-- Below 32%: Low Risk
-- 32% to below 50%: Medium Risk
-- 50% to below 75%: High Risk
-- 75% or above: Critical Risk
-
-Revenue at risk is estimated as:
-
-cancellation probability × estimated booking value
-
-Your job is to help hotel staff understand cancellation risk,
-booking operations, revenue protection and customer communication.
-
-Give practical, concise and professional answers.
-
-Do not claim that you personally made a prediction unless
-booking data has actually been provided.
-
-If the user asks about a specific booking without providing
-booking information, explain what information is needed.
-
-Never invent booking data, hotel policies, prices or customer
-information.
-
-You can explain machine-learning concepts in simple language.
-
-When recommending actions, focus on realistic hotel operations
-such as confirmation messages, proactive communication,
-monitoring, flexible modification options and prioritization.
-
-You are an assistant for decision support, not a replacement
-for hotel management.
-"""
-
-            # ------------------------------------------------
-            # CONVERSATION
-            # ------------------------------------------------
-
-            conversation_text = ""
-
-            for message in st.session_state.hotelguard_chat_history:
-
-                role = message["role"].upper()
-
-                conversation_text += (
-                    f"\n{role}: {message['content']}\n"
-                )
-
-            prompt = (
-                system_context
-                + "\n\nConversation so far:"
-                + conversation_text
-                + "\n\nRespond to the latest user question."
-            )
-
-            # ------------------------------------------------
-            # GEMINI REQUEST
-            # ------------------------------------------------
-
-            with st.chat_message("assistant"):
-
-                with st.spinner("HotelGuard AI is thinking..."):
-
-                    try:
-
-                        response = gemini_client.models.generate_content(
-                            model="gemini-2.5-flash-lite",
-                            contents=prompt,
-                        )
-
-                        answer = response.text
-
-                        st.markdown(answer)
-
-                        st.session_state.hotelguard_chat_history.append(
-                            {
-                                "role": "assistant",
-                                "content": answer,
-                            }
-                        )
-
-                    except Exception as e:
-
-                        st.error(
-                            "HotelGuard AI could not generate a response."
-                        )
-
-                        st.caption(
-                            "Please check your internet connection "
-                            "and Gemini API availability."
-                        )
-
-                        st.exception(e)
-
-        # ----------------------------------------------------
-        # CLEAR CHAT
-        # ----------------------------------------------------
-
-        if st.session_state.hotelguard_chat_history:
-
-            if st.button(
-                "🗑️ Clear Chat",
-                use_container_width=True,
-            ):
-
-                st.session_state.hotelguard_chat_history = []
-
-                st.rerun()
-
-# ============================================================
 # FOOTER
 # ============================================================
 
