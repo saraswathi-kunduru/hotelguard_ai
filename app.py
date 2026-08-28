@@ -51,6 +51,13 @@ if GEMINI_API_KEY:
 else:
     gemini_client = None
 
+from google import genai
+
+gemini_client = None
+
+if GEMINI_API_KEY:
+    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+
 # ============================================================
 # DESIGN SYSTEM
 # ============================================================
@@ -593,6 +600,7 @@ with st.sidebar:
     "🧠 Explainable AI",
     "🏨 Risk Command Center",
     "🕒 Smart Waiting List",
+    "🔄 WHAT-IF CANCELLATION SIMULATOR",
     "📈 Model Performance",
     "💬 HotelGuard AI Chatbot",
 ],
@@ -1525,10 +1533,917 @@ for hotel management.
                 st.session_state.hotelguard_chat_history = []
 
                 st.rerun()
+# ============================================================
+# 🔄 WHAT-IF CANCELLATION SIMULATOR
+# ============================================================
 
-# ============================================================
-# FOOTER
-# ============================================================
+elif page == "🔄 WHAT-IF CANCELLATION SIMULATOR":
+
+    page_header(
+        "SCENARIO INTELLIGENCE",
+        "What-If Cancellation Simulator",
+        "Modify booking conditions and see how the trained HotelGuard AI model responds.",
+    )
+
+    # ========================================================
+    # INTRODUCTION
+    # ========================================================
+
+    st.info(
+        "🔬 Start with a base booking, modify the scenario values, "
+        "and compare the cancellation-risk prediction."
+    )
+
+    # ========================================================
+    # BASE BOOKING
+    # ========================================================
+
+    st.markdown("## 🏨 Base Booking")
+
+    base_col1, base_col2, base_col3 = st.columns(3)
+
+    with base_col1:
+
+        base_lead_time = st.number_input(
+            "Lead Time",
+            min_value=0,
+            max_value=1000,
+            value=100,
+            step=1,
+            key="base_lead_time",
+        )
+
+        base_previous_cancellations = st.number_input(
+            "Previous Cancellations",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=1,
+            key="base_previous_cancellations",
+        )
+
+        base_booking_changes = st.number_input(
+            "Booking Changes",
+            min_value=0,
+            max_value=100,
+            value=0,
+            step=1,
+            key="base_booking_changes",
+        )
+
+    with base_col2:
+
+        base_special_requests = st.number_input(
+            "Special Requests",
+            min_value=0,
+            max_value=20,
+            value=1,
+            step=1,
+            key="base_special_requests",
+        )
+
+        base_weekend_nights = st.number_input(
+            "Weekend Nights",
+            min_value=0,
+            max_value=50,
+            value=1,
+            step=1,
+            key="base_weekend_nights",
+        )
+
+        base_week_nights = st.number_input(
+            "Week Nights",
+            min_value=0,
+            max_value=50,
+            value=3,
+            step=1,
+            key="base_week_nights",
+        )
+
+    with base_col3:
+
+        base_adr = st.number_input(
+            "ADR",
+            min_value=0.0,
+            max_value=10000.0,
+            value=100.0,
+            step=10.0,
+            key="base_adr",
+        )
+
+        base_repeated_guest = st.selectbox(
+            "Repeated Guest",
+            [0, 1],
+            format_func=lambda x: "Yes" if x == 1 else "No",
+            key="base_repeated_guest",
+        )
+
+        base_deposit_type = st.selectbox(
+            "Deposit Type",
+            [
+                "No Deposit",
+                "Non Refund",
+                "Refundable",
+            ],
+            key="base_deposit_type",
+        )
+
+    # ========================================================
+    # WHAT-IF SCENARIO
+    # ========================================================
+
+    st.markdown("## 🧪 What-If Scenario")
+
+    scenario_col1, scenario_col2, scenario_col3 = st.columns(3)
+
+    with scenario_col1:
+
+        scenario_lead_time = st.number_input(
+            "Lead Time",
+            min_value=0,
+            max_value=1000,
+            value=int(base_lead_time),
+            step=1,
+            key="scenario_lead_time",
+        )
+
+        scenario_previous_cancellations = st.number_input(
+            "Previous Cancellations",
+            min_value=0,
+            max_value=100,
+            value=int(base_previous_cancellations),
+            step=1,
+            key="scenario_previous_cancellations",
+        )
+
+        scenario_booking_changes = st.number_input(
+            "Booking Changes",
+            min_value=0,
+            max_value=100,
+            value=int(base_booking_changes),
+            step=1,
+            key="scenario_booking_changes",
+        )
+
+    with scenario_col2:
+
+        scenario_special_requests = st.number_input(
+            "Special Requests",
+            min_value=0,
+            max_value=20,
+            value=int(base_special_requests),
+            step=1,
+            key="scenario_special_requests",
+        )
+
+        scenario_weekend_nights = st.number_input(
+            "Weekend Nights",
+            min_value=0,
+            max_value=50,
+            value=int(base_weekend_nights),
+            step=1,
+            key="scenario_weekend_nights",
+        )
+
+        scenario_week_nights = st.number_input(
+            "Week Nights",
+            min_value=0,
+            max_value=50,
+            value=int(base_week_nights),
+            step=1,
+            key="scenario_week_nights",
+        )
+
+    with scenario_col3:
+
+        scenario_adr = st.number_input(
+            "ADR",
+            min_value=0.0,
+            max_value=10000.0,
+            value=float(base_adr),
+            step=10.0,
+            key="scenario_adr",
+        )
+
+        scenario_repeated_guest = st.selectbox(
+            "Repeated Guest",
+            [0, 1],
+            format_func=lambda x: "Yes" if x == 1 else "No",
+            key="scenario_repeated_guest",
+        )
+
+        scenario_deposit_type = st.selectbox(
+            "Deposit Type",
+            [
+                "No Deposit",
+                "Non Refund",
+                "Refundable",
+            ],
+            key="scenario_deposit_type",
+        )
+
+    st.markdown("---")
+
+    # ========================================================
+    # CREATE MODEL INPUT
+    # ========================================================
+
+    def create_simulator_input(
+        lead_time,
+        previous_cancellations,
+        booking_changes,
+        special_requests,
+        weekend_nights,
+        week_nights,
+        adr,
+        repeated_guest,
+        deposit_type,
+    ):
+
+        total_nights = int(weekend_nights + week_nights)
+
+        total_guests = 2
+
+        estimated_booking_value = float(adr * total_nights)
+
+        data = {
+            "lead_time": lead_time,
+
+            "arrival_date_year": 2017,
+            "arrival_date_week_number": 30,
+            "arrival_date_day_of_month": 15,
+
+            "stays_in_weekend_nights": weekend_nights,
+            "stays_in_week_nights": week_nights,
+
+            "adults": 2,
+            "children": 0.0,
+            "babies": 0,
+
+            "is_repeated_guest": repeated_guest,
+
+            "previous_cancellations": previous_cancellations,
+            "previous_bookings_not_canceled": 0,
+
+            "booking_changes": booking_changes,
+
+            "agent": 0,
+            "company": 0,
+
+            "days_in_waiting_list": 0,
+
+            "adr": adr,
+
+            "required_car_parking_spaces": 0,
+
+            "total_of_special_requests": special_requests,
+
+            # Engineered features
+            "total_guests": total_guests,
+            "total_nights": total_nights,
+            "estimated_booking_value": estimated_booking_value,
+
+            "is_long_stay": int(total_nights >= 7),
+
+            "is_high_value_booking": int(
+                estimated_booking_value >= 1000
+            ),
+
+            "has_previous_cancellation": int(
+                previous_cancellations > 0
+            ),
+
+            "has_booking_changes": int(
+                booking_changes > 0
+            ),
+
+            "has_special_request": int(
+                special_requests > 0
+            ),
+
+            "has_weekend_stay": int(
+                weekend_nights > 0
+            ),
+
+            # Categorical features
+            "hotel": "City Hotel",
+
+            "arrival_date_month": "July",
+
+            "meal": "BB",
+
+            "country": "PRT",
+
+            "market_segment": "Online TA",
+
+            "distribution_channel": "TA/TO",
+
+            "reserved_room_type": "A",
+
+            "assigned_room_type": "A",
+
+            "deposit_type": deposit_type,
+
+            "customer_type": "Transient",
+        }
+
+        return pd.DataFrame([data])
+
+    # ========================================================
+    # RUN SIMULATION
+    # ========================================================
+
+    run_simulation = st.button(
+        "🔬 RUN WHAT-IF SIMULATION",
+        type="primary",
+        use_container_width=True,
+    )
+
+    if run_simulation:
+
+        try:
+
+            # ------------------------------------------------
+            # CREATE BASE INPUT
+            # ------------------------------------------------
+
+            base_input = create_simulator_input(
+                base_lead_time,
+                base_previous_cancellations,
+                base_booking_changes,
+                base_special_requests,
+                base_weekend_nights,
+                base_week_nights,
+                base_adr,
+                base_repeated_guest,
+                base_deposit_type,
+            )
+
+            # ------------------------------------------------
+            # CREATE SCENARIO INPUT
+            # ------------------------------------------------
+
+            scenario_input = create_simulator_input(
+                scenario_lead_time,
+                scenario_previous_cancellations,
+                scenario_booking_changes,
+                scenario_special_requests,
+                scenario_weekend_nights,
+                scenario_week_nights,
+                scenario_adr,
+                scenario_repeated_guest,
+                scenario_deposit_type,
+            )
+
+            # ------------------------------------------------
+            # CHECK MODEL
+            # ------------------------------------------------
+
+            if model is None:
+                st.error(
+                    "❌ Trained cancellation model is not available."
+                )
+                st.stop()
+
+            # ------------------------------------------------
+            # ALIGN FEATURES WITH TRAINED MODEL
+            # ------------------------------------------------
+
+            if hasattr(model, "feature_names_in_"):
+
+                required_features = list(
+                    model.feature_names_in_
+                )
+
+                missing_base = [
+                    col
+                    for col in required_features
+                    if col not in base_input.columns
+                ]
+
+                missing_scenario = [
+                    col
+                    for col in required_features
+                    if col not in scenario_input.columns
+                ]
+
+                if missing_base:
+                    st.error(
+                        "Missing model features in Base Booking: "
+                        + ", ".join(missing_base)
+                    )
+                    st.stop()
+
+                if missing_scenario:
+                    st.error(
+                        "Missing model features in What-If Scenario: "
+                        + ", ".join(missing_scenario)
+                    )
+                    st.stop()
+
+                base_input = base_input[
+                    required_features
+                ]
+
+                scenario_input = scenario_input[
+                    required_features
+                ]
+
+            # ------------------------------------------------
+            # PREDICT
+            # ------------------------------------------------
+
+            base_probability = float(
+                model.predict_proba(base_input)[0][1]
+            )
+
+            scenario_probability = float(
+                model.predict_proba(scenario_input)[0][1]
+            )
+
+            # ------------------------------------------------
+            # RISK DIFFERENCE
+            # ------------------------------------------------
+
+            risk_change = (
+                scenario_probability
+                - base_probability
+            )
+
+            risk_change_percentage = (
+                risk_change * 100
+            )
+
+            # ------------------------------------------------
+            # RISK CLASS
+            # ------------------------------------------------
+
+            base_risk, base_class, _ = risk_info(
+                base_probability
+            )
+
+            scenario_risk, scenario_class, _ = risk_info(
+                scenario_probability
+            )
+
+            # =================================================
+            # SIMULATION RESULTS
+            # =================================================
+
+            st.markdown("---")
+            st.markdown("## 🔬 Simulation Results")
+
+            result1, result2, result3 = st.columns(3)
+
+            # ------------------------------------------------
+            # BASE RESULT
+            # ------------------------------------------------
+
+            with result1:
+
+                st.metric(
+                    label="🏨 BASE BOOKING",
+                    value=f"{base_probability:.1%}",
+                )
+
+                if base_risk == "CRITICAL":
+
+                    st.error(
+                        "🚨 CRITICAL RISK"
+                    )
+
+                elif base_risk == "HIGH":
+
+                    st.warning(
+                        "⚠️ HIGH RISK"
+                    )
+
+                elif base_risk == "MEDIUM":
+
+                    st.info(
+                        "ℹ️ MEDIUM RISK"
+                    )
+
+                else:
+
+                    st.success(
+                        "✅ LOW RISK"
+                    )
+
+            # ------------------------------------------------
+            # SCENARIO RESULT
+            # ------------------------------------------------
+
+            with result2:
+
+                st.metric(
+                    label="🧪 WHAT-IF SCENARIO",
+                    value=f"{scenario_probability:.1%}",
+                )
+
+                if scenario_risk == "CRITICAL":
+
+                    st.error(
+                        "🚨 CRITICAL RISK"
+                    )
+
+                elif scenario_risk == "HIGH":
+
+                    st.warning(
+                        "⚠️ HIGH RISK"
+                    )
+
+                elif scenario_risk == "MEDIUM":
+
+                    st.info(
+                        "ℹ️ MEDIUM RISK"
+                    )
+
+                else:
+
+                    st.success(
+                        "✅ LOW RISK"
+                    )
+
+            # ------------------------------------------------
+            # RISK CHANGE
+            # ------------------------------------------------
+
+            with result3:
+
+                st.metric(
+                    label="📈 RISK CHANGE",
+                    value=f"{risk_change:+.1%}",
+                )
+
+                if risk_change > 0.001:
+
+                    st.error(
+                        "🔴 RISK INCREASED"
+                    )
+
+                elif risk_change < -0.001:
+
+                    st.success(
+                        "🟢 RISK DECREASED"
+                    )
+
+                else:
+
+                    st.info(
+                        "🔵 NO SIGNIFICANT CHANGE"
+                    )
+
+            # =================================================
+            # VISUAL COMPARISON
+            # =================================================
+
+            st.markdown("### 📊 Cancellation Risk Comparison")
+
+            chart_df = pd.DataFrame(
+                {
+                    "Booking": [
+                        "Base Booking",
+                        "What-If Scenario",
+                    ],
+                    "Cancellation Risk": [
+                        base_probability,
+                        scenario_probability,
+                    ],
+                }
+            )
+
+            st.bar_chart(
+                chart_df.set_index("Booking"),
+                y="Cancellation Risk",
+            )
+
+            # =================================================
+            # SCENARIO COMPARISON TABLE
+            # =================================================
+
+            st.markdown("### 📋 Scenario Comparison")
+
+            comparison_df = pd.DataFrame(
+                {
+                    "Metric": [
+                        "Lead Time",
+                        "Previous Cancellations",
+                        "Booking Changes",
+                        "Special Requests",
+                        "Weekend Nights",
+                        "Week Nights",
+                        "ADR",
+                        "Repeated Guest",
+                        "Deposit Type",
+                        "Cancellation Risk",
+                    ],
+
+                    "Base Booking": [
+                        base_lead_time,
+                        base_previous_cancellations,
+                        base_booking_changes,
+                        base_special_requests,
+                        base_weekend_nights,
+                        base_week_nights,
+                        f"₹{base_adr:,.2f}",
+                        (
+                            "Yes"
+                            if base_repeated_guest
+                            else "No"
+                        ),
+                        base_deposit_type,
+                        f"{base_probability:.1%}",
+                    ],
+
+                    "What-If Scenario": [
+                        scenario_lead_time,
+                        scenario_previous_cancellations,
+                        scenario_booking_changes,
+                        scenario_special_requests,
+                        scenario_weekend_nights,
+                        scenario_week_nights,
+                        f"₹{scenario_adr:,.2f}",
+                        (
+                            "Yes"
+                            if scenario_repeated_guest
+                            else "No"
+                        ),
+                        scenario_deposit_type,
+                        f"{scenario_probability:.1%}",
+                    ],
+                }
+            )
+
+            st.dataframe(
+                comparison_df,
+                use_container_width=True,
+                hide_index=True,
+            )
+
+            # =================================================
+            # INTERPRETATION
+            # =================================================
+
+            st.markdown("### 🧠 Simulator Interpretation")
+
+            if risk_change > 0.001:
+
+                st.warning(
+                    f"""
+                    **The What-If scenario increases the predicted
+                    cancellation risk.**
+
+                    Base Booking Risk: **{base_probability:.1%}**
+
+                    What-If Scenario Risk: **{scenario_probability:.1%}**
+
+                    Risk Increase: **{risk_change_percentage:+.2f} percentage points**
+
+                    The modified booking appears more risky according
+                    to the trained HotelGuard AI model.
+                    """
+                )
+
+            elif risk_change < -0.001:
+
+                st.success(
+                    f"""
+                    **The What-If scenario decreases the predicted
+                    cancellation risk.**
+
+                    Base Booking Risk: **{base_probability:.1%}**
+
+                    What-If Scenario Risk: **{scenario_probability:.1%}**
+
+                    Risk Decrease: **{abs(risk_change_percentage):.2f} percentage points**
+
+                    The modified booking appears less risky according
+                    to the trained HotelGuard AI model.
+                    """
+                )
+
+            else:
+
+                st.info(
+                    f"""
+                    **The What-If scenario produces little or no
+                    change in predicted cancellation risk.**
+
+                    Base Booking Risk: **{base_probability:.1%}**
+
+                    What-If Scenario Risk: **{scenario_probability:.1%}**
+
+                    Risk Difference: **{risk_change_percentage:+.2f} percentage points**
+
+                    The modified variables had little effect on the
+                    model prediction for this booking.
+                    """
+                )
+
+            # =================================================
+            # BUSINESS RECOMMENDATION
+            # =================================================
+
+            st.markdown("### 🛡️ Recommended Business Action")
+
+            if scenario_risk == "CRITICAL":
+
+                st.error(
+                    """
+                    🚨 **Immediate intervention recommended.**
+
+                    Prioritize customer confirmation, proactive
+                    communication, and booking monitoring.
+                    """
+                )
+
+            elif scenario_risk == "HIGH":
+
+                st.warning(
+                    """
+                    ⚠️ **High cancellation risk.**
+
+                    Prioritize booking confirmation and proactive
+                    customer outreach.
+                    """
+                )
+
+            elif scenario_risk == "MEDIUM":
+
+                st.info(
+                    """
+                    ℹ️ **Moderate cancellation risk.**
+
+                    Monitor the booking and consider sending
+                    a confirmation reminder.
+                    """
+                )
+
+            else:
+
+                st.success(
+                    """
+                    ✅ **Low cancellation risk.**
+
+                    No immediate intervention is required.
+                    Continue normal booking monitoring.
+                    """
+                )
+
+            # =================================================
+            # CHANGED VARIABLES
+            # =================================================
+
+            changed_variables = []
+
+            if base_lead_time != scenario_lead_time:
+                changed_variables.append(
+                    f"Lead Time: {base_lead_time} → {scenario_lead_time}"
+                )
+
+            if (
+                base_previous_cancellations
+                != scenario_previous_cancellations
+            ):
+                changed_variables.append(
+                    "Previous Cancellations: "
+                    f"{base_previous_cancellations} → "
+                    f"{scenario_previous_cancellations}"
+                )
+
+            if (
+                base_booking_changes
+                != scenario_booking_changes
+            ):
+                changed_variables.append(
+                    "Booking Changes: "
+                    f"{base_booking_changes} → "
+                    f"{scenario_booking_changes}"
+                )
+
+            if (
+                base_special_requests
+                != scenario_special_requests
+            ):
+                changed_variables.append(
+                    "Special Requests: "
+                    f"{base_special_requests} → "
+                    f"{scenario_special_requests}"
+                )
+
+            if (
+                base_weekend_nights
+                != scenario_weekend_nights
+            ):
+                changed_variables.append(
+                    "Weekend Nights: "
+                    f"{base_weekend_nights} → "
+                    f"{scenario_weekend_nights}"
+                )
+
+            if (
+                base_week_nights
+                != scenario_week_nights
+            ):
+                changed_variables.append(
+                    "Week Nights: "
+                    f"{base_week_nights} → "
+                    f"{scenario_week_nights}"
+                )
+
+            if base_adr != scenario_adr:
+
+                changed_variables.append(
+                    f"ADR: ₹{base_adr:,.2f} → "
+                    f"₹{scenario_adr:,.2f}"
+                )
+
+            if (
+                base_repeated_guest
+                != scenario_repeated_guest
+            ):
+                changed_variables.append(
+                    "Repeated Guest: "
+                    + (
+                        "No → Yes"
+                        if scenario_repeated_guest
+                        else "Yes → No"
+                    )
+                )
+
+            if (
+                base_deposit_type
+                != scenario_deposit_type
+            ):
+                changed_variables.append(
+                    "Deposit Type: "
+                    f"{base_deposit_type} → "
+                    f"{scenario_deposit_type}"
+                )
+
+            # ------------------------------------------------
+            # DISPLAY CHANGES
+            # ------------------------------------------------
+
+            st.markdown("### 🔍 Variables Changed")
+
+            if changed_variables:
+
+                for change in changed_variables:
+
+                    st.write(
+                        "• " + change
+                    )
+
+            else:
+
+                st.info(
+                    "No booking variables were changed. "
+                    "Modify at least one scenario value to see "
+                    "a different What-If prediction."
+                )
+
+            # =================================================
+            # SIMULATOR NOTE
+            # =================================================
+
+            st.markdown("---")
+
+            st.info(
+                """
+                ℹ️ **Simulator Interpretation**
+
+                The What-If Simulator uses the same trained
+                HotelGuard AI model to compare a base booking
+                against a modified scenario.
+
+                The result represents the model's predicted
+                cancellation probability. It is a decision-support
+                tool and does not guarantee that a booking will
+                or will not be cancelled.
+                """
+            )
+
+        # ====================================================
+        # ERROR HANDLING
+        # ====================================================
+
+        except Exception as e:
+
+            st.error(
+                "❌ The What-If Simulator could not process the scenario."
+            )
+
+            st.error(
+                f"Error details: {str(e)}"
+            )
+
+            with st.expander(
+                "🔧 Technical Error Details"
+            ):
+
+                st.exception(e)
 
 st.markdown(
     """
