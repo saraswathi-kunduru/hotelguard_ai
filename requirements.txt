@@ -8,3 +8,5 @@ plotly
 shap
 matplotlib
 seaborn
+python-dotenv
+google-genai
