@@ -42,21 +42,38 @@ THRESHOLD = 0.32
 # GEMINI AI CLIENT
 # ============================================================
 
+# ============================================================
+# GEMINI AI CLIENT
+# ============================================================
+
 load_dotenv()
 
-# Try Streamlit Cloud Secrets first
-try:
-    GEMINI_API_KEY = st.secrets.get("GEMINI_API_KEY")
-except Exception:
-    GEMINI_API_KEY = None
+GEMINI_API_KEY = None
 
-# If not found in Streamlit Secrets, try local .env
+# ------------------------------------------------------------
+# FIRST: Try Streamlit Cloud Secrets
+# ------------------------------------------------------------
+try:
+    if "GEMINI_API_KEY" in st.secrets:
+        GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
+except Exception:
+    pass
+
+# ------------------------------------------------------------
+# SECOND: Try local .env file
+# ------------------------------------------------------------
 if not GEMINI_API_KEY:
     GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 
-# Create Gemini client
+# ------------------------------------------------------------
+# CREATE GEMINI CLIENT
+# ------------------------------------------------------------
 if GEMINI_API_KEY:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    try:
+        gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+    except Exception as e:
+        gemini_client = None
+        print("Gemini client error:", e)
 else:
     gemini_client = None
 
