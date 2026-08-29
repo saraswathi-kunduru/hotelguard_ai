@@ -4,6 +4,8 @@ import joblib
 from pathlib import Path
 import base64
 import os
+import numpy as np
+
 from dotenv import load_dotenv
 from google import genai
 # ============================================================
@@ -27,6 +29,146 @@ def load_model():
 
 
 model = load_model()
+
+# ============================================================
+# RISK COMMAND CENTER — DATA + MODEL PREDICTIONS
+# ============================================================
+
+@st.cache_data
+def load_hotel_data():
+    return pd.read_csv("hotel_bookings.csv")
+
+
+@st.cache_data
+def prepare_risk_command_data(df):
+    df = df.copy()
+
+    df["total_guests"] = (
+        df["adults"]
+        + df["children"].fillna(0)
+        + df["babies"]
+    )
+
+    df["total_nights"] = (
+        df["stays_in_weekend_nights"]
+        + df["stays_in_week_nights"]
+    )
+
+    df["estimated_booking_value"] = (
+        df["adr"] * df["total_nights"]
+    )
+
+    df["is_long_stay"] = (
+        df["total_nights"] >= 7
+    ).astype(int)
+
+    df["is_high_value_booking"] = (
+        df["estimated_booking_value"] >= 1000
+    ).astype(int)
+
+    df["has_previous_cancellation"] = (
+        df["previous_cancellations"] > 0
+    ).astype(int)
+
+    df["has_booking_changes"] = (
+        df["booking_changes"] > 0
+    ).astype(int)
+
+    df["has_special_request"] = (
+        df["total_of_special_requests"] > 0
+    ).astype(int)
+
+    df["has_weekend_stay"] = (
+        df["stays_in_weekend_nights"] > 0
+    ).astype(int)
+
+    return df
+
+
+RISK_MODEL_FEATURES = [
+    "hotel",
+    "lead_time",
+    "arrival_date_year",
+    "arrival_date_month",
+    "arrival_date_week_number",
+    "arrival_date_day_of_month",
+    "stays_in_weekend_nights",
+    "stays_in_week_nights",
+    "adults",
+    "children",
+    "babies",
+    "meal",
+    "country",
+    "market_segment",
+    "distribution_channel",
+    "is_repeated_guest",
+    "previous_cancellations",
+    "previous_bookings_not_canceled",
+    "reserved_room_type",
+    "assigned_room_type",
+    "booking_changes",
+    "deposit_type",
+    "agent",
+    "company",
+    "days_in_waiting_list",
+    "customer_type",
+    "adr",
+    "required_car_parking_spaces",
+    "total_of_special_requests",
+    "total_guests",
+    "total_nights",
+    "estimated_booking_value",
+    "is_long_stay",
+    "is_high_value_booking",
+    "has_previous_cancellation",
+    "has_booking_changes",
+    "has_special_request",
+    "has_weekend_stay",
+]
+
+
+@st.cache_data(show_spinner="Analyzing hotel bookings...")
+def generate_risk_predictions():
+    df = load_hotel_data()
+    data = prepare_risk_command_data(df)
+
+    missing_columns = [
+        col for col in RISK_MODEL_FEATURES
+        if col not in data.columns
+    ]
+
+    if missing_columns:
+        raise ValueError(
+            "The hotel booking dataset is missing required columns: "
+            + ", ".join(missing_columns)
+        )
+
+    X_risk = data[RISK_MODEL_FEATURES].copy()
+
+    probabilities = model.predict_proba(X_risk)[:, 1]
+
+    data["cancellation_probability"] = probabilities
+
+    data["risk_category"] = np.select(
+        [
+            data["cancellation_probability"] >= 0.75,
+            data["cancellation_probability"] >= 0.50,
+            data["cancellation_probability"] >= THRESHOLD,
+        ],
+        [
+            "Critical Risk",
+            "High Risk",
+            "Medium Risk",
+        ],
+        default="Low Risk",
+    )
+
+    data["expected_revenue_risk"] = (
+        data["cancellation_probability"]
+        * data["estimated_booking_value"]
+    )
+
+    return data
 
 # Load the generated AI assistant visual from the same project folder.
 # The image is embedded as base64 so Streamlit can display it reliably.
@@ -535,6 +677,135 @@ hr {
 """,
     unsafe_allow_html=True,
 )
+st.markdown("""
+<style>
+
+/* ================================
+   MOBILE RESPONSIVE DESIGN
+   ================================ */
+
+@media (max-width: 768px) {
+
+    /* Main Streamlit page */
+    .main .block-container {
+        padding: 1rem 0.8rem !important;
+        width: 100% !important;
+        max-width: 100% !important;
+    }
+
+    /* Prevent horizontal scrolling */
+    html, body {
+        overflow-x: hidden !important;
+    }
+
+    /* Headings */
+    h1 {
+        font-size: 1.8rem !important;
+    }
+
+    h2 {
+        font-size: 1.4rem !important;
+    }
+
+    h3 {
+        font-size: 1.15rem !important;
+    }
+
+    /* Columns become vertical on mobile */
+    [data-testid="stHorizontalBlock"] {
+        flex-direction: column !important;
+        gap: 0.5rem !important;
+    }
+
+    [data-testid="column"] {
+        width: 100% !important;
+        min-width: 100% !important;
+        flex: 1 1 100% !important;
+    }
+
+    /* Cards */
+    .glass-card,
+    .result-card {
+        width: 100% !important;
+        margin-bottom: 12px !important;
+        box-sizing: border-box !important;
+    }
+
+    /* Tables */
+    [data-testid="stDataFrame"] {
+        width: 100% !important;
+        overflow-x: auto !important;
+    }
+
+    /* Buttons */
+    .stButton button {
+        width: 100% !important;
+        min-height: 45px !important;
+    }
+
+    /* Inputs */
+    .stNumberInput,
+    .stSelectbox,
+    .stTextInput {
+        width: 100% !important;
+    }
+
+    /* Sidebar */
+    [data-testid="stSidebar"] {
+        min-width: 280px !important;
+        max-width: 85vw !important;
+        z-index: 999999 !important;
+    }
+
+    /* Sidebar content */
+    [data-testid="stSidebarContent"] {
+        padding: 1rem 0.8rem !important;
+    }
+
+    /* Don't allow sidebar elements to overflow */
+    [data-testid="stSidebar"] * {
+        max-width: 100%;
+        box-sizing: border-box;
+    }
+}
+
+/* ================================
+   SMALL PHONES
+   ================================ */
+
+@media (max-width: 480px) {
+
+    .main .block-container {
+        padding: 0.7rem 0.6rem !important;
+    }
+
+    h1 {
+        font-size: 1.5rem !important;
+    }
+
+    h2 {
+        font-size: 1.25rem !important;
+    }
+
+    h3 {
+        font-size: 1.05rem !important;
+    }
+
+    .glass-card {
+        padding: 15px !important;
+    }
+
+    .result-card {
+        padding: 15px !important;
+    }
+
+    .risk-number {
+        font-size: 2rem !important;
+    }
+}
+
+</style>
+""", unsafe_allow_html=True)
 
 
 
@@ -1230,6 +1501,464 @@ elif page == "🧠 Explainable AI":
         """,
         unsafe_allow_html=True,
     )
+# ============================================================
+# RISK COMMAND CENTER
+# ============================================================
+
+elif page == "🏨 Risk Command Center":
+
+    page_header(
+        "HOTEL OPERATIONS",
+        "Risk Command Center",
+        "Portfolio-level cancellation risk and revenue exposure.",
+    )
+
+    try:
+        risk_results = generate_risk_predictions()
+
+        total_bookings = len(risk_results)
+        critical_risk = (
+            risk_results["risk_category"] == "Critical Risk"
+        ).sum()
+        high_risk = (
+            risk_results["risk_category"] == "High Risk"
+        ).sum()
+        medium_risk = (
+            risk_results["risk_category"] == "Medium Risk"
+        ).sum()
+        low_risk = (
+            risk_results["risk_category"] == "Low Risk"
+        ).sum()
+
+        revenue_at_risk = (
+            risk_results["expected_revenue_risk"].sum()
+        )
+
+        st.markdown("### 🏨 Booking Risk Overview")
+
+        c1, c2, c3, c4 = st.columns(4)
+
+        with c1:
+            kpi(
+                "TOTAL BOOKINGS",
+                f"{total_bookings:,}",
+                "Portfolio",
+            )
+
+        with c2:
+            kpi(
+                "CRITICAL + HIGH",
+                f"{critical_risk + high_risk:,}",
+                "Immediate attention",
+            )
+
+        with c3:
+            kpi(
+                "MEDIUM RISK",
+                f"{medium_risk:,}",
+                "Monitor",
+            )
+
+        with c4:
+            kpi(
+                "LOW RISK",
+                f"{low_risk:,}",
+                "Normal",
+            )
+
+        st.markdown("### 💰 Revenue Exposure")
+
+        st.metric(
+            "Expected Revenue at Risk",
+            f"₹{revenue_at_risk:,.2f}",
+        )
+
+        st.caption(
+            "Expected revenue at risk = cancellation probability × "
+            "estimated booking value."
+        )
+
+        st.markdown("### 📊 Risk Distribution")
+
+        risk_distribution = pd.DataFrame(
+            {
+                "Risk Level": [
+                    "Critical Risk",
+                    "High Risk",
+                    "Medium Risk",
+                    "Low Risk",
+                ],
+                "Bookings": [
+                    critical_risk,
+                    high_risk,
+                    medium_risk,
+                    low_risk,
+                ],
+            }
+        )
+
+        st.bar_chart(
+            risk_distribution.set_index("Risk Level"),
+            use_container_width=True,
+        )
+
+        st.markdown("### 🚨 Highest-Risk Bookings")
+
+        display_columns = [
+            col for col in [
+                "hotel",
+                "lead_time",
+                "arrival_date_month",
+                "arrival_date_day_of_month",
+                "adults",
+                "children",
+                "reserved_room_type",
+                "deposit_type",
+                "cancellation_probability",
+                "risk_category",
+                "estimated_booking_value",
+                "expected_revenue_risk",
+            ]
+            if col in risk_results.columns
+        ]
+
+        top_risk = (
+            risk_results
+            .sort_values(
+                "cancellation_probability",
+                ascending=False,
+            )
+            .head(25)
+            .copy()
+        )
+
+        top_risk["cancellation_probability"] = (
+            top_risk["cancellation_probability"] * 100
+        ).round(1)
+
+        top_risk["estimated_booking_value"] = (
+            top_risk["estimated_booking_value"].round(2)
+        )
+
+        top_risk["expected_revenue_risk"] = (
+            top_risk["expected_revenue_risk"].round(2)
+        )
+
+        st.dataframe(
+            top_risk[display_columns],
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.caption(
+            "Risk Command Center uses the existing trained XGBoost model. "
+            "It does not retrain or modify the model."
+        )
+
+    except Exception as e:
+        st.error(
+            "❌ Risk Command Center could not analyze the booking portfolio."
+        )
+        st.error(f"Error details: {str(e)}")
+
+        with st.expander("🔧 Technical Error Details"):
+            st.exception(e)
+
+
+# ============================================================
+# SMART WAITING LIST
+# ============================================================
+
+elif page == "🕒 Smart Waiting List" :
+
+    page_header(
+        "HOTEL OPERATIONS",
+        "Smart Waiting List",
+        "Prioritize waiting customers when rooms become available.",
+    )
+
+    st.markdown(
+        """
+        <div class="glass-card">
+            <h3>🕒 Room Availability & Waiting List Prioritization</h3>
+            <p>
+                Add waiting customers below and HotelGuard AI will rank them
+                using a transparent operational priority score based on
+                arrival urgency, waiting time, and booking requirements.
+            </p>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.markdown("### 🏨 Room Availability")
+
+    room_col1, room_col2 = st.columns(2)
+
+    with room_col1:
+        available_rooms = st.number_input(
+            "Rooms Currently Available",
+            min_value=1,
+            max_value=500,
+            value=3,
+            step=1,
+            key="waiting_available_rooms",
+        )
+
+    with room_col2:
+        priority_mode = st.selectbox(
+            "Priority Strategy",
+            [
+                "Balanced",
+                "Arrival Urgency",
+                "Waiting Time",
+            ],
+            key="waiting_priority_mode",
+        )
+
+    st.markdown("### 👥 Waiting Customers")
+
+    waiting_default = pd.DataFrame(
+        [
+            {
+                "Customer": "WL-001",
+                "Days Waiting": 5,
+                "Arrival In": 2,
+                "Guests": 2,
+                "Room Type": "A",
+                "Special Requests": 1,
+            },
+            {
+                "Customer": "WL-002",
+                "Days Waiting": 12,
+                "Arrival In": 7,
+                "Guests": 3,
+                "Room Type": "B",
+                "Special Requests": 0,
+            },
+            {
+                "Customer": "WL-003",
+                "Days Waiting": 3,
+                "Arrival In": 1,
+                "Guests": 2,
+                "Room Type": "A",
+                "Special Requests": 2,
+            },
+            {
+                "Customer": "WL-004",
+                "Days Waiting": 18,
+                "Arrival In": 14,
+                "Guests": 1,
+                "Room Type": "C",
+                "Special Requests": 0,
+            },
+            {
+                "Customer": "WL-005",
+                "Days Waiting": 8,
+                "Arrival In": 4,
+                "Guests": 4,
+                "Room Type": "B",
+                "Special Requests": 1,
+            },
+        ]
+    )
+
+    waiting_data = st.data_editor(
+        waiting_default,
+        use_container_width=True,
+        hide_index=True,
+        num_rows="dynamic",
+        key="hotelguard_waiting_list",
+        column_config={
+            "Customer": st.column_config.TextColumn(
+                "Customer ID",
+                help="Unique waiting-list reference.",
+            ),
+            "Days Waiting": st.column_config.NumberColumn(
+                "Days Waiting",
+                min_value=0,
+                step=1,
+            ),
+            "Arrival In": st.column_config.NumberColumn(
+                "Arrival In (days)",
+                min_value=0,
+                step=1,
+            ),
+            "Guests": st.column_config.NumberColumn(
+                "Guests",
+                min_value=1,
+                step=1,
+            ),
+            "Room Type": st.column_config.TextColumn(
+                "Requested Room",
+            ),
+            "Special Requests": st.column_config.NumberColumn(
+                "Special Requests",
+                min_value=0,
+                step=1,
+            ),
+        },
+    )
+
+    if waiting_data.empty:
+        st.info("Add at least one customer to generate the priority queue.")
+    else:
+        queue = waiting_data.copy()
+
+        numeric_columns = [
+            "Days Waiting",
+            "Arrival In",
+            "Guests",
+            "Special Requests",
+        ]
+
+        for column in numeric_columns:
+            queue[column] = pd.to_numeric(
+                queue[column], errors="coerce"
+            ).fillna(0)
+
+        # --------------------------------------------------------
+        # TRANSPARENT PRIORITY SCORING
+        # --------------------------------------------------------
+        # Higher score = higher operational priority.
+        # The score is intentionally rule-based and transparent;
+        # it does not alter or retrain the existing XGBoost model.
+
+        max_wait = max(float(queue["Days Waiting"].max()), 1.0)
+        max_arrival = max(float(queue["Arrival In"].max()), 1.0)
+        max_requests = max(float(queue["Special Requests"].max()), 1.0)
+
+        queue["Waiting Score"] = (
+            queue["Days Waiting"] / max_wait
+        ) * 100
+
+        queue["Arrival Urgency"] = (
+            1 - (queue["Arrival In"] / max_arrival)
+        ) * 100
+
+        queue["Request Score"] = (
+            queue["Special Requests"] / max_requests
+        ) * 100
+
+        if priority_mode == "Arrival Urgency":
+            queue["Priority Score"] = (
+                queue["Arrival Urgency"] * 0.60
+                + queue["Waiting Score"] * 0.25
+                + queue["Request Score"] * 0.15
+            )
+        elif priority_mode == "Waiting Time":
+            queue["Priority Score"] = (
+                queue["Waiting Score"] * 0.60
+                + queue["Arrival Urgency"] * 0.25
+                + queue["Request Score"] * 0.15
+            )
+        else:
+            queue["Priority Score"] = (
+                queue["Arrival Urgency"] * 0.45
+                + queue["Waiting Score"] * 0.40
+                + queue["Request Score"] * 0.15
+            )
+
+        queue = queue.sort_values(
+            "Priority Score",
+            ascending=False,
+        ).reset_index(drop=True)
+
+        queue["Priority"] = np.select(
+            [
+                queue["Priority Score"] >= 70,
+                queue["Priority Score"] >= 45,
+            ],
+            [
+                "🔴 High",
+                "🟡 Medium",
+            ],
+            default="🟢 Low",
+        )
+
+        queue["Rank"] = np.arange(1, len(queue) + 1)
+
+        recommended = queue.head(int(available_rooms))
+
+        st.markdown("### 🎯 Recommended Contact Queue")
+
+        k1, k2, k3 = st.columns(3)
+
+        with k1:
+            kpi(
+                "WAITING CUSTOMERS",
+                f"{len(queue):,}",
+                "Current queue",
+            )
+
+        with k2:
+            kpi(
+                "ROOMS AVAILABLE",
+                f"{available_rooms:,}",
+                "Ready to allocate",
+            )
+
+        with k3:
+            kpi(
+                "PRIORITY CONTACTS",
+                f"{len(recommended):,}",
+                "Recommended first",
+            )
+
+        display_queue = queue[
+            [
+                "Rank",
+                "Customer",
+                "Priority",
+                "Priority Score",
+                "Days Waiting",
+                "Arrival In",
+                "Guests",
+                "Room Type",
+                "Special Requests",
+            ]
+        ].copy()
+
+        display_queue["Priority Score"] = (
+            display_queue["Priority Score"].round(1)
+        )
+
+        st.dataframe(
+            display_queue,
+            use_container_width=True,
+            hide_index=True,
+        )
+
+        st.markdown("### ⭐ Recommended Customers")
+
+        for _, row in recommended.iterrows():
+            if row["Priority Score"] >= 70:
+                st.error(
+                    f"**{row['Customer']} — High Priority**  "
+                    f"| Score: {row['Priority Score']:.1f}  "
+                    f"| Arrival in {int(row['Arrival In'])} days  "
+                    f"| Waiting {int(row['Days Waiting'])} days"
+                )
+            elif row["Priority Score"] >= 45:
+                st.warning(
+                    f"**{row['Customer']} — Medium Priority**  "
+                    f"| Score: {row['Priority Score']:.1f}  "
+                    f"| Arrival in {int(row['Arrival In'])} days  "
+                    f"| Waiting {int(row['Days Waiting'])} days"
+                )
+            else:
+                st.success(
+                    f"**{row['Customer']} — Low Priority**  "
+                    f"| Score: {row['Priority Score']:.1f}  "
+                    f"| Arrival in {int(row['Arrival In'])} days  "
+                    f"| Waiting {int(row['Days Waiting'])} days"
+                )
+
+        st.caption(
+            "Priority Score is an operational ranking aid based on the selected "
+            "strategy. It does not retrain or modify the existing XGBoost model."
+        )
+
 
 # ============================================================
 # MODEL PERFORMANCE
@@ -1315,6 +2044,8 @@ elif page == "📈 Model Performance":
         "HotelGuard AI combines cancellation prediction, explainability and "
         "revenue-at-risk estimation into a decision-support workflow for hotel teams."
     )
+
+
     # ============================================================
 # HOTELGUARD AI CHATBOT
 # ============================================================
